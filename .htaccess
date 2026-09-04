@@ -1,0 +1,60 @@
+Options -Indexes
+RewriteEngine On
+
+# Archivos sensibles y respaldos: nunca deben descargarse desde la web.
+<FilesMatch "(^config\.php$|^config\.example\.php$|^\.env$|\.(sql|zip|bak|md)$)">
+  Require all denied
+</FilesMatch>
+
+# Código interno y migraciones solo se cargan mediante PHP; no son rutas públicas.
+RewriteRule ^(?:app|database|tools)/ - [F,L,NC]
+
+# URLs antiguas -> rutas amigables (solo cuando vienen desde el navegador)
+RewriteCond %{THE_REQUEST} \s/+public/index\.php(?:[?\s]) [NC]
+RewriteRule ^public/index\.php$ /dashboard [R=302,L,NE]
+RewriteCond %{THE_REQUEST} \s/+public/movimientos\.php(?:[?\s]) [NC]
+RewriteRule ^public/movimientos\.php$ /movimientos [R=302,L,NE]
+RewriteCond %{THE_REQUEST} \s/+public/configuracion\.php(?:[?\s]) [NC]
+RewriteRule ^public/configuracion\.php$ /configuracion [R=302,L,NE]
+RewriteCond %{THE_REQUEST} \s/+public/login\.php(?:[?\s]) [NC]
+RewriteRule ^public/login\.php$ /login [R=302,L,NE]
+RewriteCond %{THE_REQUEST} \s/+public/logout\.php(?:[?\s]) [NC]
+RewriteRule ^public/logout\.php$ /logout [R=302,L,NE]
+
+# Rutas amigables
+RewriteRule ^dashboard/?$ public/index.php [L,QSA]
+RewriteRule ^movimientos/?$ public/movimientos.php [L,QSA]
+RewriteRule ^cuentas/?$ public/cuentas.php [L,QSA]
+RewriteRule ^fondos/?$ public/fondos.php [L,QSA]
+RewriteRule ^presupuesto/?$ /ahorro [R=302,L,NE]
+RewriteRule ^ahorro/?$ public/ahorro.php [L,QSA]
+RewriteRule ^configuracion/(conceptos|pagos|ingresos-fijos|categorias|metas|hogar|notificaciones)/?$ public/configuracion.php?tab=$1 [L,QSA]
+RewriteRule ^configuracion/?$ public/configuracion.php?tab=conceptos [L,QSA]
+RewriteRule ^login/?$ public/login.php [L,QSA]
+RewriteRule ^logout/?$ public/logout.php [L,QSA]
+
+# No reescribir archivos/carpetas reales
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+
+# Rendimiento de recursos estáticos
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/css text/javascript application/javascript application/json image/svg+xml
+</IfModule>
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/css "access plus 7 days"
+  ExpiresByType application/javascript "access plus 7 days"
+  ExpiresByType text/javascript "access plus 7 days"
+  ExpiresByType image/svg+xml "access plus 30 days"
+  ExpiresByType image/png "access plus 30 days"
+  ExpiresByType image/jpeg "access plus 30 days"
+  ExpiresByType image/webp "access plus 30 days"
+</IfModule>
+<IfModule mod_headers.c>
+  <FilesMatch "\.(css|js|svg|png|jpg|jpeg|webp)$">
+    Header set Cache-Control "public, max-age=604800"
+  </FilesMatch>
+</IfModule>
