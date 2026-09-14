@@ -56,47 +56,71 @@
   function accountProtected(a){return Math.max(0,Number(a.savings_reserved||0));}
   function fundLabel(f){return `${f.icon||'💰'} ${f.name}`;}
 
-  // Campos monetarios legibles: muestra 2,100.00 pero envía 2100.00 al backend.
+  // Campos monetarios: mientras escribes NO se agregan ceros ni separadores.
+  // Se permite 113.50 (o 113,50) de forma natural y solo se formatea al salir del campo.
   function parseMoneyInput(value){
     let v=String(value??'').trim().replace(/\s/g,'').replace(/S\/?/gi,'').replace(/[^0-9,.-]/g,'');
     if(!v)return 0;
     const neg=v.startsWith('-');v=v.replace(/-/g,'');
     const lastDot=v.lastIndexOf('.'),lastComma=v.lastIndexOf(',');
-    if(lastDot>=0&&lastComma>=0){const dec=Math.max(lastDot,lastComma);v=v.slice(0,dec).replace(/[.,]/g,'')+'.'+v.slice(dec+1).replace(/[.,]/g,'');}
-    else if(lastComma>=0){const right=v.length-lastComma-1;v=right>0&&right<=2?v.replace(/\./g,'').replace(',','.'):v.replace(/,/g,'');}
-    else if(lastDot>=0){const right=v.length-lastDot-1;if(right===3&&v.indexOf('.')===lastDot)v=v.replace(/\./g,'');else{const parts=v.split('.');if(parts.length>2)v=parts.slice(0,-1).join('')+'.'+parts.at(-1);}}
+    if(lastDot>=0&&lastComma>=0){
+      const dec=Math.max(lastDot,lastComma);
+      v=v.slice(0,dec).replace(/[.,]/g,'')+'.'+v.slice(dec+1).replace(/[.,]/g,'');
+    }else if(lastComma>=0){
+      const parts=v.split(','),right=parts.at(-1).length;
+      if(parts.length>2){v=right<=2?parts.slice(0,-1).join('')+'.'+parts.at(-1):parts.join('');}
+      else v=right<=2?v.replace(',','.'):v.replace(/,/g,'');
+    }else if(lastDot>=0){
+      const parts=v.split('.'),right=parts.at(-1).length;
+      if(parts.length>2)v=right<=2?parts.slice(0,-1).join('')+'.'+parts.at(-1):parts.join('');
+      // Con un solo punto lo tratamos siempre como decimal. Así 113.500 no salta a 113,500.
+    }
     const n=Number(v);return Number.isFinite(n)?(neg?-n:n):0;
   }
   function moneyFieldRaw(el){return parseMoneyInput(el?.value).toFixed(2);}
-  function moneyFieldSet(el,value){if(!el)return;const n=Number(value||0);el.value=Number.isFinite(n)&&n!==0?n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):(value===''?'':'0.00');}
-  function formatMoneyField(el){if(!el||!el.value.trim())return;moneyFieldSet(el,parseMoneyInput(el.value));}
-  function caretFromDigitCount(formatted,digitCount){
-    const dec=formatted.indexOf('.'),limit=dec>=0?dec:formatted.length;let seen=0;
-    for(let i=0;i<limit;i++){if(/\d/.test(formatted[i]))seen++;if(seen>=digitCount)return i+1;}
-    return limit;
+  function moneyFieldSet(el,value){
+    if(!el)return;
+    if(value===''){el.value='';return;}
+    const n=Number(value||0);
+    el.value=Number.isFinite(n)?n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'';
   }
-  function liveFormatMoneyField(el){
+  function moneyFieldEdit(el){
+    if(!el||!el.value.trim())return;
+    const n=parseMoneyInput(el.value);
+    el.value=Number.isFinite(n)?n.toFixed(2):'';
+  }
+  function formatMoneyField(el){if(!el||!el.value.trim())return;moneyFieldSet(el,parseMoneyInput(el.value));}
+  function normalizeMoneyTyping(raw){
+    raw=String(raw??'').replace(/S\/?/gi,'').replace(/\s/g,'');
+    let out='',decimal=false,decimals=0;
+    for(const ch of raw){
+      if(/\d/.test(ch)){
+        if(decimal){if(decimals>=2)continue;decimals++;}
+        out+=ch;
+      }else if((ch==='.'||ch===',')&&!decimal){
+        if(!out)out='0';out+='.';decimal=true;
+      }
+    }
+    return out;
+  }
+  function sanitizeMoneyTyping(el){
     if(!el||el.dataset.moneyFormatting==='1')return;
-    const raw=el.value;if(raw==='')return;
-    const pos=el.selectionStart??raw.length,sep=Math.max(raw.lastIndexOf('.'),raw.lastIndexOf(','));
-    const inDecimals=sep>=0&&pos>sep;
-    const integerDigitCount=(raw.slice(0,inDecimals?sep:pos).match(/\d/g)||[]).length;
-    const decimalDigitCount=inDecimals?(raw.slice(sep+1,pos).match(/\d/g)||[]).length:0;
-    const n=parseMoneyInput(raw);
-    const formatted=Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-    el.dataset.moneyFormatting='1';el.value=formatted;
-    requestAnimationFrame(()=>{
-      let next;if(inDecimals){const d=formatted.indexOf('.');next=Math.min(formatted.length,d+1+Math.min(2,decimalDigitCount));}
-      else next=caretFromDigitCount(formatted,Math.max(1,integerDigitCount));
-      try{el.setSelectionRange(next,next)}catch{}
-      delete el.dataset.moneyFormatting;
-    });
+    const raw=el.value,pos=el.selectionStart??raw.length;
+    const before=normalizeMoneyTyping(raw.slice(0,pos)),clean=normalizeMoneyTyping(raw);
+    if(raw===clean)return;
+    el.dataset.moneyFormatting='1';el.value=clean;
+    const next=Math.min(clean.length,before.length);
+    requestAnimationFrame(()=>{try{el.setSelectionRange(next,next)}catch{}delete el.dataset.moneyFormatting;});
   }
   function bindMoneyFields(root=document){root.querySelectorAll?.('[data-money-input]').forEach(el=>{
     if(el.dataset.moneyBound)return;el.dataset.moneyBound='1';
-    el.addEventListener('focus',()=>{if(el.value.trim()){formatMoneyField(el);const d=el.value.indexOf('.');try{el.setSelectionRange(d>=0?d:el.value.length,d>=0?d:el.value.length)}catch{}}});
-    el.addEventListener('keydown',e=>{if(e.key==='.'||e.key===','){e.preventDefault();if(!el.value.trim())el.value='0.00';else formatMoneyField(el);const d=el.value.indexOf('.');try{el.setSelectionRange(d+1,d+3)}catch{}}});
-    el.addEventListener('input',()=>liveFormatMoneyField(el));
+    el.addEventListener('focus',()=>moneyFieldEdit(el));
+    el.addEventListener('input',()=>sanitizeMoneyTyping(el));
+    el.addEventListener('paste',e=>{
+      const text=e.clipboardData?.getData('text');if(text==null)return;
+      e.preventDefault();const n=parseMoneyInput(text);el.value=Number.isFinite(n)?n.toFixed(2):'';
+      requestAnimationFrame(()=>{try{el.setSelectionRange(el.value.length,el.value.length)}catch{}});
+    });
     el.addEventListener('blur',()=>formatMoneyField(el));
   });}
 

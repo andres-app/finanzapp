@@ -1,34 +1,13 @@
 (()=>{
  const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],api=f=>`${APP.apiBase}/${f}`,data=window.SAVINGS_DATA||{savings:{goals:[]},accounts:[],free:0};
  const money=n=>'S/ '+Number(n||0).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2});
- const parseMoneyInput=value=>{let v=String(value??'').trim().replace(/\s/g,'').replace(/S\/?/gi,'').replace(/[^0-9,.-]/g,'');if(!v)return 0;const neg=v.startsWith('-');v=v.replace(/-/g,'');const d=v.lastIndexOf('.'),c=v.lastIndexOf(',');if(d>=0&&c>=0){const x=Math.max(d,c);v=v.slice(0,x).replace(/[.,]/g,'')+'.'+v.slice(x+1).replace(/[.,]/g,'')}else if(c>=0){const r=v.length-c-1;v=r>0&&r<=2?v.replace(/\./g,'').replace(',','.'):v.replace(/,/g,'')}else if(d>=0){const r=v.length-d-1;if(r===3&&v.indexOf('.')===d)v=v.replace(/\./g,'');else{const p=v.split('.');if(p.length>2)v=p.slice(0,-1).join('')+'.'+p.at(-1)}}const n=Number(v);return Number.isFinite(n)?(neg?-n:n):0};
+ const parseMoneyInput=value=>{let v=String(value??'').trim().replace(/\s/g,'').replace(/S\/?/gi,'').replace(/[^0-9,.-]/g,'');if(!v)return 0;const neg=v.startsWith('-');v=v.replace(/-/g,'');const d=v.lastIndexOf('.'),c=v.lastIndexOf(',');if(d>=0&&c>=0){const x=Math.max(d,c);v=v.slice(0,x).replace(/[.,]/g,'')+'.'+v.slice(x+1).replace(/[.,]/g,'')}else if(c>=0){const p=v.split(','),r=p.at(-1).length;v=p.length>2?(r<=2?p.slice(0,-1).join('')+'.'+p.at(-1):p.join('')):(r<=2?v.replace(',','.'):v.replace(/,/g,''))}else if(d>=0){const p=v.split('.'),r=p.at(-1).length;if(p.length>2)v=r<=2?p.slice(0,-1).join('')+'.'+p.at(-1):p.join('')}const n=Number(v);return Number.isFinite(n)?(neg?-n:n):0};
  const moneyFieldRaw=el=>parseMoneyInput(el?.value).toFixed(2);
- const moneyFieldSet=(el,value)=>{if(!el)return;const n=Number(value||0);el.value=Number.isFinite(n)&&n!==0?n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):(value===''?'':'0.00')};
- function appNotice(message,type='error'){
-   document.querySelector('#appFeedbackToast')?.remove();
-   const el=document.createElement('div');el.id='appFeedbackToast';el.className=`app-feedback-toast ${type}`;el.setAttribute('role','status');el.setAttribute('aria-live','assertive');
-   el.innerHTML=`<span class="app-feedback-icon">${type==='error'?'!':'✓'}</span><div><b>${type==='error'?'No se pudo completar':'Listo'}</b><p>${esc(message)}</p></div><button type="button" aria-label="Cerrar">×</button>`;
-   document.body.appendChild(el);requestAnimationFrame(()=>el.classList.add('show'));
-   const close=()=>{el.classList.remove('show');setTimeout(()=>el.remove(),220)};el.querySelector('button').onclick=close;setTimeout(close,type==='error'?4300:2800);
- }
- function modalFeedback(modal,message,type='error'){
-   if(!modal)return;let box=modal.querySelector('[data-modal-feedback]');
-   if(!box){box=document.createElement('div');box.className='modal-inline-feedback';box.dataset.modalFeedback='1';const form=modal.querySelector('form');const submit=form?.querySelector('button[type="submit"]');if(form&&submit)form.insertBefore(box,submit);}
-   box.className=`modal-inline-feedback ${type} show`;box.innerHTML=`<span class="feedback-mark">${type==='error'?'!':'✓'}</span><p>${esc(message)}</p>`;
- }
- function clearModalFeedback(modal){const box=modal?.querySelector('[data-modal-feedback]');if(box){box.classList.remove('show');box.innerHTML='';}}
- function caretFromDigitCount(formatted,digitCount){const dec=formatted.indexOf('.'),limit=dec>=0?dec:formatted.length;let seen=0;for(let i=0;i<limit;i++){if(/\d/.test(formatted[i]))seen++;if(seen>=digitCount)return i+1}return limit}
- function liveFormatMoneyField(el){
-   if(!el||el.dataset.moneyFormatting==='1')return;const raw=el.value;if(raw==='')return;const pos=el.selectionStart??raw.length,sep=Math.max(raw.lastIndexOf('.'),raw.lastIndexOf(',')),inDecimals=sep>=0&&pos>sep;
-   const integerDigitCount=(raw.slice(0,inDecimals?sep:pos).match(/\d/g)||[]).length,decimalDigitCount=inDecimals?(raw.slice(sep+1,pos).match(/\d/g)||[]).length:0;
-   const formatted=Number(parseMoneyInput(raw)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});el.dataset.moneyFormatting='1';el.value=formatted;
-   requestAnimationFrame(()=>{let next;if(inDecimals){const d=formatted.indexOf('.');next=Math.min(formatted.length,d+1+Math.min(2,decimalDigitCount))}else next=caretFromDigitCount(formatted,Math.max(1,integerDigitCount));try{el.setSelectionRange(next,next)}catch{}delete el.dataset.moneyFormatting});
- }
- const bindMoneyFields=()=>$$('[data-money-input]').forEach(el=>{if(el.dataset.moneyBound)return;el.dataset.moneyBound='1';
-   el.addEventListener('focus',()=>{if(el.value.trim()){moneyFieldSet(el,parseMoneyInput(el.value));const d=el.value.indexOf('.');try{el.setSelectionRange(d>=0?d:el.value.length,d>=0?d:el.value.length)}catch{}}});
-   el.addEventListener('keydown',e=>{if(e.key==='.'||e.key===','){e.preventDefault();if(!el.value.trim())el.value='0.00';else moneyFieldSet(el,parseMoneyInput(el.value));const d=el.value.indexOf('.');try{el.setSelectionRange(d+1,d+3)}catch{}}});
-   el.addEventListener('input',()=>liveFormatMoneyField(el));el.addEventListener('blur',()=>{if(el.value.trim())moneyFieldSet(el,parseMoneyInput(el.value))});
- });
+ const moneyFieldSet=(el,value)=>{if(!el)return;if(value===''){el.value='';return}const n=Number(value||0);el.value=Number.isFinite(n)?n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):''};
+ function moneyFieldEdit(el){if(!el||!el.value.trim())return;const n=parseMoneyInput(el.value);el.value=Number.isFinite(n)?n.toFixed(2):''}
+ function normalizeMoneyTyping(raw){raw=String(raw??'').replace(/S\/?/gi,'').replace(/\s/g,'');let out='',decimal=false,decimals=0;for(const ch of raw){if(/\d/.test(ch)){if(decimal){if(decimals>=2)continue;decimals++}out+=ch}else if((ch==='.'||ch===',')&&!decimal){if(!out)out='0';out+='.';decimal=true}}return out}
+ function sanitizeMoneyTyping(el){if(!el||el.dataset.moneyFormatting==='1')return;const raw=el.value,pos=el.selectionStart??raw.length,before=normalizeMoneyTyping(raw.slice(0,pos)),clean=normalizeMoneyTyping(raw);if(raw===clean)return;el.dataset.moneyFormatting='1';el.value=clean;const next=Math.min(clean.length,before.length);requestAnimationFrame(()=>{try{el.setSelectionRange(next,next)}catch{}delete el.dataset.moneyFormatting})}
+ const bindMoneyFields=()=>$$('[data-money-input]').forEach(el=>{if(el.dataset.moneyBound)return;el.dataset.moneyBound='1';el.addEventListener('focus',()=>moneyFieldEdit(el));el.addEventListener('input',()=>sanitizeMoneyTyping(el));el.addEventListener('paste',e=>{const text=e.clipboardData?.getData('text');if(text==null)return;e.preventDefault();const n=parseMoneyInput(text);el.value=Number.isFinite(n)?n.toFixed(2):'';requestAnimationFrame(()=>{try{el.setSelectionRange(el.value.length,el.value.length)}catch{}})});el.addEventListener('blur',()=>{if(el.value.trim())moneyFieldSet(el,parseMoneyInput(el.value))})});
  const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
  const nowLocal=()=>new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16);
  async function post(file,payload){const r=await fetch(api(file),{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':APP.csrf},body:JSON.stringify(payload)}),raw=await r.text();let j={};try{j=JSON.parse(raw)}catch{}if(!r.ok||j.ok===false)throw new Error(j.message||`Error HTTP ${r.status}`);return j}
