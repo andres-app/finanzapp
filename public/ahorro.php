@@ -17,8 +17,8 @@ try {
 if(!$moduleError){
     try{$history=FinanceService::savingsHistory($uid,40);}catch(Throwable $e){$historyError='El historial no pudo cargarse temporalmente.';error_log('[MiDinero ahorro page v9 history] '.$e->getMessage());}
     try{
-        // Usa exactamente la misma disponibilidad segura que el Dashboard:
-        // efectivo - fondos/ahorro - compromisos pendientes no cubiertos.
+        // Usa la misma disponibilidad libre que el Dashboard para asignaciones:
+        // efectivo - fondos/ahorro ya reservados. Los pagos pendientes no se descuentan.
         $dashFree=FinanceService::dashboard($uid,date('Y-m'));
         $free=max(0,(float)($dashFree['summary']['free_to_spend']??0));
     } catch(Throwable $e){
@@ -42,7 +42,7 @@ page_top('Ahorro','ahorro');
     <article class="primary"><span>AHORRO PROTEGIDO</span><strong>S/ <?=number_format((float)$savings['total_saved'],2)?></strong><small>No se puede usar en gastos hasta que lo retires.</small></article>
     <article><span>Con meta</span><strong>S/ <?=number_format((float)$savings['assigned_to_goals'],2)?></strong><small>Asignado a tus objetivos.</small></article>
     <article><span>Sin meta</span><strong>S/ <?=number_format((float)$savings['general_saved'],2)?></strong><small>Ahorro general protegido.</small></article>
-    <article><span>Disponible para ahorrar</span><strong>S/ <?=number_format(max(0,$free),2)?></strong><small>Sin tocar compromisos.</small></article>
+    <article><span>Disponible para ahorrar</span><strong>S/ <?=number_format(max(0,$free),2)?></strong><small>Dinero no asignado a fondos ni ahorro.</small></article>
   </section>
 
   <section class="savings-protection-note">

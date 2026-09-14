@@ -10,7 +10,7 @@ page_top('Fondos','fondos');
     <div class="page-head-actions"><a class="btn primary" href="<?=e(app_url('dashboard?action=allocate'))?>">◎ Separar dinero</a></div>
   </div>
 
-  <div class="fund-summary-strip"><div><span>Fondos de gasto</span><strong>S/ <?=number_format($reservedGeneral,2)?></strong></div><div><span>Ahorro aparte</span><strong>S/ <?=number_format($savedReserved,2)?></strong></div><div class="free"><span>Disponible seguro</span><strong>S/ <?=number_format($free,2)?></strong></div></div>
+  <div class="fund-summary-strip"><div><span>Fondos de gasto</span><strong>S/ <?=number_format($reservedGeneral,2)?></strong></div><div><span>Ahorro aparte</span><strong>S/ <?=number_format($savedReserved,2)?></strong></div><div class="free"><span>Disponible sin asignar</span><strong>S/ <?=number_format($free,2)?></strong></div></div>
   <div class="simple-tip"><span>💡</span><div><b>Separar no significa gastar</b><p>Cuando mandas S/ 500 a Emergencia, tu patrimonio no cambia. Solo estás diciendo “este dinero tiene un propósito”.</p></div></div>
 
   <div class="funds-grid-large">

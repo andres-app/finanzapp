@@ -333,31 +333,12 @@ class FinanceService {
     }
 
     /**
-     * Dinero libre global después de fondos y compromisos pendientes.
-     * No llama dashboard(), para poder usarse con seguridad dentro de
-     * operaciones financieras transaccionales.
+     * Dinero libre global después de fondos y ahorro ya reservados.
+     * Los pagos pendientes son solo compromisos informativos: no reducen el
+     * saldo hasta que se registran realmente como gasto/pago.
      */
     public static function freeToSpendNow(int $userId): float {
-        $cash=self::totalCash($userId);
-        $funds=self::funds($userId);
-        $reserved=0.0;$fundAvailableMap=[];
-        foreach($funds as $f){
-            $av=max(0.0,(float)$f['available']);
-            $reserved+=$av;$fundAvailableMap[(int)$f['id']]=$av;
-        }
-        $currentPeriod=date('Y-m');
-        $monthEnd=(new DateTimeImmutable($currentPeriod.'-01'))->modify('+1 month')->format('Y-m-d');
-        $st=db()->prepare("SELECT mp.amount,r.fund_id FROM monthly_payments mp JOIN recurring_payments r ON r.id=mp.recurring_id WHERE mp.user_id=? AND mp.status='pending' AND mp.due_date<?");
-        $st->execute([$userId,$monthEnd]);
-        $pending=0.0;$dueByFund=[];
-        foreach($st->fetchAll() as $r){
-            $amount=(float)$r['amount'];$pending+=$amount;
-            if(!empty($r['fund_id'])){ $fid=(int)$r['fund_id'];$dueByFund[$fid]=($dueByFund[$fid]??0)+$amount; }
-        }
-        $funded=0.0;
-        foreach($dueByFund as $fid=>$due) $funded+=min((float)$due,(float)($fundAvailableMap[$fid]??0));
-        $uncovered=max(0.0,$pending-$funded);
-        return $cash-$reserved-$uncovered;
+        return self::totalCash($userId)-self::totalReserved($userId);
     }
 
     public static function dashboard(int $userId, string $period): array {
@@ -512,7 +493,9 @@ class FinanceService {
         $fundedCoverage=0;
         foreach($dueByFund as $fid=>$due) $fundedCoverage += min($due, $fundAvailableMap[$fid] ?? 0);
         $uncoveredPending=max(0,$pendingTotal-$fundedCoverage);
-        $freeToSpend=$unallocated-$uncoveredPending;
+        // Los pendientes se muestran como referencia, pero no descuentan dinero real.
+        // El saldo cambia recién cuando el usuario registra efectivamente el pago/gasto.
+        $freeToSpend=$unallocated;
 
         $savings=self::savingsOverview($userId);
         $savingByGoal=[];foreach($savings['goals'] as $sg)$savingByGoal[(int)$sg['id']]=(float)$sg['saved_amount'];
@@ -534,7 +517,7 @@ class FinanceService {
             'period'=>$period,'previous_period'=>$prevPeriod,'next_period'=>$nextPeriod,
             'summary'=>[
                 'income'=>$income,'expense'=>$expense,'balance'=>$monthNet,'adjustment'=>$monthAdjustment,'ant'=>(float)$cur['ant'],
-                'opening_balance'=>$opening,'closing_balance'=>$closing,'total_cash'=>$totalCash,
+                'opening_balance'=>$opening,'closing_balance'=>$closing,'total_cash'=>$totalCash,'available_in_accounts'=>$totalCash,
                 'reserved'=>$reserved,'operational_reserved'=>$operationalReserved,'savings_reserved'=>$savingsReserved,
                 'unallocated'=>$unallocated,'pending_total'=>$pendingTotal,
                 'funded_pending'=>$fundedCoverage,'uncovered_pending'=>$uncoveredPending,'free_to_spend'=>$freeToSpend,

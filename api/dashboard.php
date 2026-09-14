@@ -201,7 +201,8 @@ try {
         $fundedCoverage=0.0;
         foreach($dueByFund as $fid=>$due)$fundedCoverage+=min($due,$fundAvailableMap[$fid]??0.0);
         $uncoveredPending=max(0,$pendingTotal-$fundedCoverage);
-        $free=$unallocated-$uncoveredPending;
+        // Los pagos pendientes no descuentan el saldo: solo un pago/gasto registrado lo hace.
+        $free=$unallocated;
         $nextPeriod=$startDt->modify('+1 month')->format('Y-m');
 
         // El cálculo compatible también debe conservar el módulo de Ahorro.
@@ -231,7 +232,7 @@ try {
             'period'=>$period,'previous_period'=>$prevPeriod,'next_period'=>$nextPeriod,'current_period'=>$currentPeriod,
             'summary'=>[
                 'income'=>$income,'expense'=>$expense,'balance'=>$monthNet,'adjustment'=>0,'ant'=>(float)$cur['ant'],
-                'opening_balance'=>$opening,'closing_balance'=>$opening+$monthNet,'total_cash'=>$totalCash,
+                'opening_balance'=>$opening,'closing_balance'=>$opening+$monthNet,'total_cash'=>$totalCash,'available_in_accounts'=>$totalCash,
                 'reserved'=>$reserved,'operational_reserved'=>$operationalReserved,'savings_reserved'=>$savingsReserved,
                 'unallocated'=>$unallocated,'pending_total'=>$pendingTotal,'funded_pending'=>$fundedCoverage,
                 'uncovered_pending'=>$uncoveredPending,'free_to_spend'=>$free,'income_change'=>$pct($income,$pi),

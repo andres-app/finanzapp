@@ -55,12 +55,12 @@ page_top('Dashboard','dashboard');
 
   <section class="minimal-money-card">
     <div class="minimal-money-main">
-      <span>DISPONIBLE HOY</span>
+      <span>SALDO DISPONIBLE EN CUENTAS</span>
       <strong id="freeToSpend">S/ 0.00</strong>
-      <p id="cashExplanation">Después de reservas y compromisos.</p>
+      <p id="cashExplanation">Se descuenta solo cuando registras un pago o gasto.</p>
     </div>
     <div class="minimal-money-stats">
-      <div><span>En cuentas</span><strong id="totalCash">S/ 0.00</strong></div>
+      <div><span>Libre sin asignar</span><strong id="unallocatedHero">S/ 0.00</strong></div>
       <div><span>Por pagar</span><strong id="pendingHero">S/ 0.00</strong></div>
       <div><span>En fondos</span><strong id="reservedTotal">S/ 0.00</strong></div>
       <div><span>En ahorro</span><strong id="heroSavingsTotal">S/ 0.00</strong></div>
