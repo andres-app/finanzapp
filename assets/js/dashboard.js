@@ -140,10 +140,10 @@
     const s=d.summary;
     setText('#periodLabel',periodLabel(d.period));
     const availableInAccounts=Number(s.available_in_accounts??s.total_cash??0);
-    setText('#unallocatedHero',money(s.unallocated));setText('#reservedTotal',money(s.operational_reserved??s.reserved));setText('#pendingHero',money(s.pending_total));animateMoney('#freeToSpend',availableInAccounts);
+    setText('#reservedTotal',money(s.operational_reserved??s.reserved));setText('#pendingHero',money(s.pending_total));animateMoney('#freeToSpend',availableInAccounts);
     const free=$('#freeToSpend');if(free)free.classList.toggle('negative',availableInAccounts<0);
     setText('#cashExplanation',Number(s.pending_total||0)>0
-      ? `${money(s.pending_total)} está por pagar, pero aún no se descuenta del saldo. Se restará cuando registres el pago.`
+      ? 'Los pagos pendientes todavía no reducen este saldo. Se descontarán cuando los registres como pagados.'
       : 'Este saldo refleja únicamente movimientos ya registrados.');
     setText('#monthIncome',money(s.income));setText('#monthExpense',money(s.expense));setText('#monthNet',money(s.balance));
     const net=$('#monthNet');if(net){net.classList.toggle('negative',Number(s.balance)<0);net.classList.toggle('positive',Number(s.balance)>0);}

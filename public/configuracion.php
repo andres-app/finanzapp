@@ -291,11 +291,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $st = $pdo->prepare('UPDATE recurring_payments SET category_id=?,concept_id=?,fund_id=?,name=?,amount=?,due_day=?,icon=? WHERE id=? AND user_id=? AND active=1');
             $st->execute([$categoryId,$conceptId,$fundId,$name,$amount,$dueDay,$icon,$recurringId,$uid]);
 
-            // El registro maestro es la fuente de verdad. No sincronizamos monthly_payments
-            // dentro de esta transacción: una tabla derivada nunca debe bloquear la edición.
+            // El registro maestro es la fuente de verdad. Primero confirmamos el cambio.
             $pdo->commit();
 
-            // Realtime es auxiliar. Si falla, la configuración YA quedó guardada.
+            // Luego sincronizamos de inmediato el pago pendiente del mes actual y los
+            // meses futuros. Así el Dashboard refleja el nuevo monto sin esperar otra
+            // generación de obligaciones. Si esta tabla auxiliar falla, el cambio base
+            // ya quedó guardado y no se pierde la edición del usuario.
+            try {
+                cfg_sync_pending_payment_dates($pdo, $uid, $recurringId, $amount, $dueDay);
+            } catch (Throwable $syncError) {
+                error_log('[MiDinero sync pago fijo] ' . $syncError->getMessage());
+            }
+
+            // Realtime se emite después de sincronizar para que otras pestañas lean
+            // directamente el importe actualizado.
             try {
                 emit_event($uid, 'config_changed', ['recurring_id' => $recurringId, 'amount' => $amount]);
             } catch (Throwable $eventError) {

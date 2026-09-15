@@ -1,5 +1,7 @@
 <?php
 require __DIR__.'/../app/bootstrap.php';
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
 $uid=require_auth();
 require __DIR__.'/../app/FinanceService.php';
 $period=$_GET['period']??date('Y-m');
