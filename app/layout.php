@@ -3,6 +3,7 @@ function nav_svg(string $name): string {
     $icons = [
         'dashboard' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-13h6V4h-6v3Z"/></svg>',
         'movimientos' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h13M17 4l3 3-3 3M17 17H4m3-3-3 3 3 3"/></svg>',
+        'actividad' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-2.05-4.95L14 10h7V3l-2.63 2.63A8.96 8.96 0 0 0 12 3Zm-1 4h2v5.2l3.3 2-1 1.7L11 13.3V7Z"/></svg>',
         'cuentas' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5 12 3l9 4.5V10H3V7.5ZM5 12h2v6H5v-6Zm6 0h2v6h-2v-6Zm6 0h2v6h-2v-6ZM3 20h18"/></svg>',
         'fondos' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2Zm2 0V7a5 5 0 0 1 10 0v2m-5 4v3"/></svg>',
         'ahorro' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c4.4 0 8 2.7 8 6.1 0 2.1-1.2 4-3.2 5.1V19h-3v-2.2c-.6.1-1.2.2-1.8.2s-1.2-.1-1.8-.2V19h-3v-4.8C5.2 13.1 4 11.2 4 9.1 4 5.7 7.6 3 12 3Zm-2.5 5.2h5M17.8 7H20v3"/></svg>',
@@ -37,6 +38,7 @@ function page_top(string $title, string $active = 'dashboard'): void {
         <nav class="side-nav">
             <a class="<?=$active==='dashboard'?'active':''?>" href="<?=e(app_url('dashboard'))?>"><?=nav_svg('dashboard')?><span>Dashboard</span></a>
             <a class="<?=$active==='movimientos'?'active':''?>" href="<?=e(app_url('movimientos'))?>"><?=nav_svg('movimientos')?><span>Movimientos</span></a>
+            <a class="<?=$active==='actividad'?'active':''?>" href="<?=e(app_url('actividad'))?>"><?=nav_svg('actividad')?><span>Actividad</span></a>
             <a class="<?=$active==='cuentas'?'active':''?>" href="<?=e(app_url('cuentas'))?>"><?=nav_svg('cuentas')?><span>Cuentas</span></a>
             <a class="<?=$active==='fondos'?'active':''?>" href="<?=e(app_url('fondos'))?>"><?=nav_svg('fondos')?><span>Fondos</span></a>
             <a class="<?=$active==='ahorro'?'active':''?>" href="<?=e(app_url('ahorro'))?>"><?=nav_svg('ahorro')?><span>Ahorro</span></a>
@@ -62,7 +64,7 @@ function page_top(string $title, string $active = 'dashboard'): void {
             <span class="live-dot"><i></i> vivo</span>
         </header>
 <?php
-    echo '<script>window.APP={csrf:' . json_encode(csrf_token()) . ',apiBase:' . json_encode($apiBase) . ',routes:{dashboard:' . json_encode(app_url('dashboard')) . ',movimientos:' . json_encode(app_url('movimientos')) . ',cuentas:' . json_encode(app_url('cuentas')) . ',fondos:' . json_encode(app_url('fondos')) . ',ahorro:' . json_encode(app_url('ahorro')) . ',presupuesto:' . json_encode(app_url('ahorro')) . ',configuracion:' . json_encode(app_url('configuracion')) . '}};</script>';
+    echo '<script>window.APP={csrf:' . json_encode(csrf_token()) . ',apiBase:' . json_encode($apiBase) . ',routes:{dashboard:' . json_encode(app_url('dashboard')) . ',movimientos:' . json_encode(app_url('movimientos')) . ',actividad:' . json_encode(app_url('actividad')) . ',cierre:' . json_encode(app_url('cierre')) . ',cuentas:' . json_encode(app_url('cuentas')) . ',fondos:' . json_encode(app_url('fondos')) . ',ahorro:' . json_encode(app_url('ahorro')) . ',presupuesto:' . json_encode(app_url('ahorro')) . ',configuracion:' . json_encode(app_url('configuracion')) . '}};</script>';
     echo '<script src="' . e(app_url('assets/js/app-shell.js')) . '?v=' . e((string)@filemtime(__DIR__.'/../assets/js/app-shell.js')) . '"></script>';
 ?>
         <section class="content" data-page="<?=e($active)?>">

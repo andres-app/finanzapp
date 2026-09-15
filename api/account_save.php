@@ -19,10 +19,12 @@ $pdo=db();
 $pdo->beginTransaction();
 try{
     finance_lock_user($uid);
+    $adjustmentId=0;$adjustmentAmount=0.0;$accountWasNew=false;$beforeAccount=null;
     if($id){
-        $own=$pdo->prepare('SELECT id FROM financial_accounts WHERE id=? AND user_id=? AND active=1 FOR UPDATE');
+        $own=$pdo->prepare('SELECT id,name,account_type,icon,color FROM financial_accounts WHERE id=? AND user_id=? AND active=1 FOR UPDATE');
         $own->execute([$id,$uid]);
-        if(!$own->fetch())throw new DomainException('Cuenta inválida.');
+        $beforeAccount=$own->fetch();
+        if(!$beforeAccount)throw new DomainException('Cuenta inválida.');
 
         $current=FinanceService::accountBalance($uid,$id);
         $st=$pdo->prepare('UPDATE financial_accounts SET name=?,account_type=?,icon=?,color=? WHERE id=? AND user_id=? AND active=1');
@@ -39,11 +41,13 @@ try{
                 // históricos. El ajuste queda auditado en la fecha real de conciliación.
                 $adj=$pdo->prepare('INSERT INTO account_adjustments(user_id,created_by_user_id,account_id,amount,occurred_at,note) VALUES(?,?,?,?,?,?)');
                 $adj->execute([$uid,actual_user_id(),$id,$delta,date('Y-m-d H:i:s'),'Ajuste de saldo real']);
+                $adjustmentId=(int)$pdo->lastInsertId();$adjustmentAmount=$delta;
             }
         }else{
             $desiredCurrent=$current;
         }
     }else{
+        $accountWasNew=true;
         // Una cuenta nueva no debe aparecer retroactivamente en meses anteriores.
         // Su saldo inicial se registra como ajuste fechado hoy.
         $st=$pdo->prepare('INSERT INTO financial_accounts(user_id,name,account_type,icon,opening_balance,color) VALUES(?,?,?,?,0,?)');
@@ -52,7 +56,23 @@ try{
         if(abs($desiredCurrent)>=0.005){
             $adj=$pdo->prepare('INSERT INTO account_adjustments(user_id,created_by_user_id,account_id,amount,occurred_at,note) VALUES(?,?,?,?,?,?)');
             $adj->execute([$uid,actual_user_id(),$id,$desiredCurrent,date('Y-m-d H:i:s'),'Saldo al agregar cuenta']);
+            $adjustmentId=(int)$pdo->lastInsertId();$adjustmentAmount=$desiredCurrent;
         }
+    }
+    $afterAccount=['id'=>$id,'name'=>$name,'account_type'=>$type,'icon'=>$icon,'color'=>$color,'balance'=>$desiredCurrent];
+    FinanceAudit::record(
+        $uid,$accountWasNew?'account_created':'account_updated','account',$id,
+        $accountWasNew?'Cuenta creada':'Cuenta actualizada',
+        $name,
+        $beforeAccount,$afterAccount,null,false
+    );
+    if($adjustmentId){
+        FinanceAudit::record(
+            $uid,'account_adjustment_created','account_adjustment',$adjustmentId,'Ajuste de saldo',
+            $name.' · '.($adjustmentAmount>=0?'+':'−').' S/ '.number_format(abs($adjustmentAmount),2),
+            null,['account_id'=>$id,'amount'=>$adjustmentAmount,'account_name'=>$name],
+            ['period'=>date('Y-m')],true
+        );
     }
     $pdo->commit();
     emit_event($uid,'account_changed',['id'=>$id]);

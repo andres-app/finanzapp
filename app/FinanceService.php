@@ -28,7 +28,7 @@ class FinanceService {
             SET status='paid',paid_amount=GREATEST(paid_amount,?),paid_at=?,transaction_id=?
             WHERE user_id=? AND recurring_id=? AND period=? AND status IN ('pending','partial')");
         $findPaymentTx=db()->prepare("SELECT t.id,t.occurred_at,t.amount,t.created_by_user_id,t.created_at FROM transactions t
-            WHERE t.user_id=? AND t.type='expense' AND t.category_id=? AND t.concept_id=?
+            WHERE t.user_id=? AND t.voided_at IS NULL AND t.type='expense' AND t.category_id=? AND t.concept_id=?
               AND t.occurred_at>=? AND t.occurred_at<?
               AND NOT EXISTS (SELECT 1 FROM monthly_payment_parts part WHERE part.transaction_id=t.id)
               AND NOT EXISTS (
@@ -132,14 +132,14 @@ class FinanceService {
     public static function accountBalances(int $userId): array {
         FinanceSchema::ensure($userId);
         $adjustmentSql = self::tableExistsForService('account_adjustments')
-            ? "+ COALESCE((SELECT SUM(ad.amount) FROM account_adjustments ad WHERE ad.user_id=a.user_id AND ad.account_id=a.id),0)"
+            ? "+ COALESCE((SELECT SUM(ad.amount) FROM account_adjustments ad WHERE ad.user_id=a.user_id AND ad.account_id=a.id AND ad.voided_at IS NULL),0)"
             : "";
         $sql = "SELECT a.id,a.name,a.account_type,a.icon,a.color,a.opening_balance,
             a.opening_balance
-            + COALESCE((SELECT SUM(CASE WHEN t.type='income' THEN t.amount ELSE -t.amount END) FROM transactions t WHERE t.user_id=a.user_id AND t.account_id=a.id),0)
+            + COALESCE((SELECT SUM(CASE WHEN t.type='income' THEN t.amount ELSE -t.amount END) FROM transactions t WHERE t.user_id=a.user_id AND t.account_id=a.id AND t.voided_at IS NULL),0)
             {$adjustmentSql}
-            + COALESCE((SELECT SUM(tr.amount) FROM account_transfers tr WHERE tr.user_id=a.user_id AND tr.to_account_id=a.id),0)
-            - COALESCE((SELECT SUM(tr.amount) FROM account_transfers tr WHERE tr.user_id=a.user_id AND tr.from_account_id=a.id),0) balance
+            + COALESCE((SELECT SUM(tr.amount) FROM account_transfers tr WHERE tr.user_id=a.user_id AND tr.to_account_id=a.id AND tr.voided_at IS NULL),0)
+            - COALESCE((SELECT SUM(tr.amount) FROM account_transfers tr WHERE tr.user_id=a.user_id AND tr.from_account_id=a.id AND tr.voided_at IS NULL),0) balance
             FROM financial_accounts a WHERE a.user_id=? AND a.active=1 ORDER BY a.id";
         $st = db()->prepare($sql);
         $st->execute([$userId]);
@@ -151,10 +151,10 @@ class FinanceService {
         $st = db()->prepare("SELECT f.id,f.name,f.icon,f.color,f.target_amount,
             CASE WHEN LOWER(TRIM(f.name))='ahorro' OR f.name LIKE '__SAV7__%' THEN -1 ELSE NULL END savings_goal_id,
             CASE WHEN LOWER(TRIM(f.name))='ahorro' OR f.name LIKE '__SAV7__%' THEN 'Ahorro' ELSE NULL END savings_goal_name,
-            COALESCE((SELECT SUM(fa.amount) FROM fund_allocations fa WHERE fa.user_id=f.user_id AND fa.fund_id=f.id),0) allocated_net,
-            COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id=f.user_id AND t.fund_id=f.id AND t.type='expense'),0) spent,
-            COALESCE((SELECT SUM(fa.amount) FROM fund_allocations fa WHERE fa.user_id=f.user_id AND fa.fund_id=f.id),0)
-             - COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id=f.user_id AND t.fund_id=f.id AND t.type='expense'),0) available
+            COALESCE((SELECT SUM(fa.amount) FROM fund_allocations fa WHERE fa.user_id=f.user_id AND fa.fund_id=f.id AND fa.voided_at IS NULL),0) allocated_net,
+            COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id=f.user_id AND t.fund_id=f.id AND t.type='expense' AND t.voided_at IS NULL),0) spent,
+            COALESCE((SELECT SUM(fa.amount) FROM fund_allocations fa WHERE fa.user_id=f.user_id AND fa.fund_id=f.id AND fa.voided_at IS NULL),0)
+             - COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id=f.user_id AND t.fund_id=f.id AND t.type='expense' AND t.voided_at IS NULL),0) available
             FROM funds f WHERE f.user_id=? AND f.active=1 ORDER BY f.id");
         $st->execute([$userId]);
         return $st->fetchAll();
@@ -163,7 +163,7 @@ class FinanceService {
     public static function savingsGoalSaved(int $userId,int $goalId): float {
         $fund=SavingsSchema::savingsFund($userId,false,true);
         if(!$fund) return 0.0;
-        $st=db()->prepare("SELECT amount,note FROM fund_allocations WHERE user_id=? AND fund_id=? ORDER BY id");
+        $st=db()->prepare("SELECT amount,note FROM fund_allocations WHERE user_id=? AND fund_id=? AND voided_at IS NULL ORDER BY id");
         $st->execute([$userId,(int)$fund['id']]);
         $sum=0.0;
         foreach($st->fetchAll() as $r){
@@ -225,7 +225,7 @@ class FinanceService {
 
     public static function savingsAccountBreakdown(int $userId,int $goalId,int $fundId,float $savedTotal): array {
         $st=db()->prepare("SELECT id,amount,note,occurred_at FROM fund_allocations
-            WHERE user_id=? AND fund_id=? ORDER BY occurred_at,id");
+            WHERE user_id=? AND fund_id=? AND voided_at IS NULL ORDER BY occurred_at,id");
         $st->execute([$userId,$fundId]);
         $byAccount=[];
         foreach($st->fetchAll() as $row){
@@ -257,7 +257,7 @@ class FinanceService {
         FinanceSchema::ensure($userId);SavingsSchema::ensure($userId);
         $limit=max(1,min(500,$limit));$fund=SavingsSchema::savingsFund($userId,false,true);
         if(!$fund)return [];
-        $where='WHERE fa.user_id=? AND fa.fund_id=?';
+        $where='WHERE fa.user_id=? AND fa.fund_id=? AND fa.voided_at IS NULL';
         $params=[$userId,(int)$fund['id']];
         if($start!==null){$where.=' AND fa.occurred_at>=?';$params[]=$start;}
         if($end!==null){$where.=' AND fa.occurred_at<?';$params[]=$end;}
@@ -316,7 +316,7 @@ class FinanceService {
         try {
             $fund=SavingsSchema::savingsFund($userId,false,true);
             if(!$fund) return [];
-            $st=db()->prepare('SELECT amount,note FROM fund_allocations WHERE user_id=? AND fund_id=? ORDER BY id');
+            $st=db()->prepare('SELECT amount,note FROM fund_allocations WHERE user_id=? AND fund_id=? AND voided_at IS NULL ORDER BY id');
             $st->execute([$userId,(int)$fund['id']]);
             $out=[];
             foreach($st->fetchAll() as $r){
@@ -371,7 +371,7 @@ class FinanceService {
             COALESCE(SUM(CASE WHEN type='income' THEN amount ELSE 0 END),0) income,
             COALESCE(SUM(CASE WHEN type='expense' THEN amount ELSE 0 END),0) expense,
             COALESCE(SUM(CASE WHEN type='expense' AND is_ant_expense=1 THEN amount ELSE 0 END),0) ant
-            FROM transactions WHERE user_id=? AND occurred_at>=? AND occurred_at<?");
+            FROM transactions WHERE user_id=? AND voided_at IS NULL AND occurred_at>=? AND occurred_at<?");
         $sumStmt->execute([$userId,$start,$end]); $cur = $sumStmt->fetch();
         $sumStmt->execute([$userId,$pStart,$pEnd]); $prev = $sumStmt->fetch();
 
@@ -379,16 +379,16 @@ class FinanceService {
         if ($hasAdjustments) {
             $openingStmt = db()->prepare("SELECT
                 COALESCE((SELECT SUM(opening_balance) FROM financial_accounts WHERE user_id=? AND active=1),0)
-                + COALESCE((SELECT SUM(CASE WHEN type='income' THEN amount ELSE -amount END) FROM transactions WHERE user_id=? AND occurred_at<?),0)
-                + COALESCE((SELECT SUM(amount) FROM account_adjustments WHERE user_id=? AND occurred_at<?),0)");
+                + COALESCE((SELECT SUM(CASE WHEN type='income' THEN amount ELSE -amount END) FROM transactions WHERE user_id=? AND voided_at IS NULL AND occurred_at<?),0)
+                + COALESCE((SELECT SUM(amount) FROM account_adjustments WHERE user_id=? AND voided_at IS NULL AND occurred_at<?),0)");
             $openingStmt->execute([$userId,$userId,$start,$userId,$start]);
-            $adjStmt = db()->prepare("SELECT COALESCE(SUM(amount),0) FROM account_adjustments WHERE user_id=? AND occurred_at>=? AND occurred_at<?");
+            $adjStmt = db()->prepare("SELECT COALESCE(SUM(amount),0) FROM account_adjustments WHERE user_id=? AND voided_at IS NULL AND occurred_at>=? AND occurred_at<?");
             $adjStmt->execute([$userId,$start,$end]);
             $monthAdjustment = (float)$adjStmt->fetchColumn();
         } else {
             $openingStmt = db()->prepare("SELECT
                 COALESCE((SELECT SUM(opening_balance) FROM financial_accounts WHERE user_id=? AND active=1),0)
-                + COALESCE((SELECT SUM(CASE WHEN type='income' THEN amount ELSE -amount END) FROM transactions WHERE user_id=? AND occurred_at<?),0)");
+                + COALESCE((SELECT SUM(CASE WHEN type='income' THEN amount ELSE -amount END) FROM transactions WHERE user_id=? AND voided_at IS NULL AND occurred_at<?),0)");
             $openingStmt->execute([$userId,$userId,$start]);
             $monthAdjustment = 0.0;
         }
@@ -396,7 +396,7 @@ class FinanceService {
 
         $cat = db()->prepare("SELECT c.id,c.name,c.icon,c.color,SUM(t.amount) total
             FROM transactions t JOIN categories c ON c.id=t.category_id
-            WHERE t.user_id=? AND t.type='expense' AND t.occurred_at>=? AND t.occurred_at<?
+            WHERE t.user_id=? AND t.voided_at IS NULL AND t.type='expense' AND t.occurred_at>=? AND t.occurred_at<?
             GROUP BY c.id,c.name,c.icon,c.color ORDER BY total DESC LIMIT 8");
         $cat->execute([$userId,$start,$end]);
 
@@ -406,10 +406,10 @@ class FinanceService {
                     CASE WHEN type='income' THEN amount ELSE 0 END income,
                     CASE WHEN type='expense' THEN amount ELSE 0 END expense,
                     0 adjustment
-                FROM transactions WHERE user_id=? AND occurred_at>=? AND occurred_at<?
+                FROM transactions WHERE user_id=? AND voided_at IS NULL AND occurred_at>=? AND occurred_at<?
                 UNION ALL
                 SELECT DATE(occurred_at) d,0 income,0 expense,amount adjustment
-                FROM account_adjustments WHERE user_id=? AND occurred_at>=? AND occurred_at<?
+                FROM account_adjustments WHERE user_id=? AND voided_at IS NULL AND occurred_at>=? AND occurred_at<?
             ) z GROUP BY d ORDER BY d");
             $daily->execute([$userId,$start,$end,$userId,$start,$end]);
         } else {
@@ -417,14 +417,14 @@ class FinanceService {
                 COALESCE(SUM(CASE WHEN type='income' THEN amount ELSE 0 END),0) income,
                 COALESCE(SUM(CASE WHEN type='expense' THEN amount ELSE 0 END),0) expense,
                 0 adjustment
-                FROM transactions WHERE user_id=? AND occurred_at>=? AND occurred_at<?
+                FROM transactions WHERE user_id=? AND voided_at IS NULL AND occurred_at>=? AND occurred_at<?
                 GROUP BY DATE(occurred_at) ORDER BY d");
             $daily->execute([$userId,$start,$end]);
         }
 
         $ant = db()->prepare("SELECT COALESCE(co.name,c.name) name,c.icon,SUM(t.amount) total,COUNT(*) qty
             FROM transactions t JOIN categories c ON c.id=t.category_id LEFT JOIN concepts co ON co.id=t.concept_id
-            WHERE t.user_id=? AND t.type='expense' AND t.is_ant_expense=1 AND t.occurred_at>=? AND t.occurred_at<?
+            WHERE t.user_id=? AND t.voided_at IS NULL AND t.type='expense' AND t.is_ant_expense=1 AND t.occurred_at>=? AND t.occurred_at<?
             GROUP BY name,c.icon ORDER BY total DESC LIMIT 6");
         $ant->execute([$userId,$start,$end]);
 
@@ -495,7 +495,7 @@ class FinanceService {
             FROM transactions t JOIN categories c ON c.id=t.category_id LEFT JOIN concepts co ON co.id=t.concept_id
             LEFT JOIN financial_accounts a ON a.id=t.account_id LEFT JOIN funds f ON f.id=t.fund_id
             LEFT JOIN users u ON u.id=COALESCE(t.created_by_user_id,t.user_id)
-            WHERE t.user_id=? ORDER BY t.id DESC LIMIT 10");
+            WHERE t.user_id=? AND t.voided_at IS NULL ORDER BY t.id DESC LIMIT 10");
         $recent->execute([$userId]);
 
         // Ingresos fijos son expectativas, no dinero real hasta que exista una
@@ -504,7 +504,7 @@ class FinanceService {
         if (class_exists('FinanceSchema')) {
             try {
                 $fi=db()->prepare("SELECT r.id,r.name,r.icon,mie.amount expected_amount,DAY(mie.due_date) income_day,mie.due_date,r.concept_id,r.account_id,a.name account_name,
-                    COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id=r.user_id AND t.type='income' AND t.concept_id=r.concept_id AND t.occurred_at>=? AND t.occurred_at<?),0) received_amount
+                    COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id=r.user_id AND t.voided_at IS NULL AND t.type='income' AND t.concept_id=r.concept_id AND t.occurred_at>=? AND t.occurred_at<?),0) received_amount
                     FROM monthly_income_expectations mie
                     JOIN recurring_incomes r ON r.id=mie.recurring_id AND r.user_id=mie.user_id
                     LEFT JOIN financial_accounts a ON a.id=r.account_id

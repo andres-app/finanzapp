@@ -51,6 +51,7 @@ try {
     $st = $pdo->prepare('INSERT INTO concepts(user_id,category_id,name,default_amount,is_ant_expense) VALUES(?,?,?,?,?)');
     $st->execute([$uid,$categoryId,$name,$defaultAmount,$isAnt ? 1 : 0]);
     $id = (int)$pdo->lastInsertId();
+    FinanceAudit::record($uid,'concept_created','concept',$id,'Concepto creado',$name,null,['category_id'=>$categoryId,'category_name'=>$cat['name'],'name'=>$name,'default_amount'=>$defaultAmount,'is_ant_expense'=>$isAnt?1:0],null,false);
     emit_event($uid,'config_changed',['concept_id'=>$id]);
 
     json_response([

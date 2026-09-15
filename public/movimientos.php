@@ -3,15 +3,15 @@ require __DIR__.'/../app/bootstrap.php';
 $uid=require_auth();FinanceSchema::ensure($uid);require __DIR__.'/../app/layout.php';
 $period=$_GET['period']??date('Y-m');[$s,$e2]=month_range($period);
 
-$st=db()->prepare("SELECT t.*,c.name category,c.icon,co.name concept,a.name account,a.icon account_icon,f.name fund,f.icon fund_icon,u.name actor_name FROM transactions t JOIN categories c ON c.id=t.category_id LEFT JOIN concepts co ON co.id=t.concept_id LEFT JOIN financial_accounts a ON a.id=t.account_id LEFT JOIN funds f ON f.id=t.fund_id LEFT JOIN users u ON u.id=COALESCE(t.created_by_user_id,t.user_id) WHERE t.user_id=? AND t.occurred_at>=? AND t.occurred_at<? ORDER BY t.occurred_at DESC");
+$st=db()->prepare("SELECT t.*,c.name category,c.icon,co.name concept,a.name account,a.icon account_icon,f.name fund,f.icon fund_icon,u.name actor_name FROM transactions t JOIN categories c ON c.id=t.category_id LEFT JOIN concepts co ON co.id=t.concept_id LEFT JOIN financial_accounts a ON a.id=t.account_id LEFT JOIN funds f ON f.id=t.fund_id LEFT JOIN users u ON u.id=COALESCE(t.created_by_user_id,t.user_id) WHERE t.user_id=? AND t.voided_at IS NULL AND t.occurred_at>=? AND t.occurred_at<? ORDER BY t.occurred_at DESC");
 $st->execute([$uid,$s,$e2]);$rows=$st->fetchAll();
 
 // Las transferencias creadas internamente por Ahorro ya quedan representadas
 // como un movimiento de Ahorro; no las repetimos en la tabla de transferencias.
-$tr=db()->prepare("SELECT tr.*,a1.name from_name,a1.icon from_icon,a2.name to_name,a2.icon to_icon,u.name actor_name FROM account_transfers tr JOIN financial_accounts a1 ON a1.id=tr.from_account_id JOIN financial_accounts a2 ON a2.id=tr.to_account_id LEFT JOIN users u ON u.id=COALESCE(tr.created_by_user_id,tr.user_id) WHERE tr.user_id=? AND tr.occurred_at>=? AND tr.occurred_at<? AND (tr.description IS NULL OR tr.description NOT LIKE 'Ahorro protegido%') ORDER BY tr.occurred_at DESC");
+$tr=db()->prepare("SELECT tr.*,a1.name from_name,a1.icon from_icon,a2.name to_name,a2.icon to_icon,u.name actor_name FROM account_transfers tr JOIN financial_accounts a1 ON a1.id=tr.from_account_id JOIN financial_accounts a2 ON a2.id=tr.to_account_id LEFT JOIN users u ON u.id=COALESCE(tr.created_by_user_id,tr.user_id) WHERE tr.user_id=? AND tr.voided_at IS NULL AND tr.occurred_at>=? AND tr.occurred_at<? AND (tr.description IS NULL OR tr.description NOT LIKE 'Ahorro protegido%') ORDER BY tr.occurred_at DESC");
 $tr->execute([$uid,$s,$e2]);$transfers=$tr->fetchAll();
 
-$ad=db()->prepare("SELECT ad.*,a.name account,a.icon account_icon,u.name actor_name FROM account_adjustments ad JOIN financial_accounts a ON a.id=ad.account_id LEFT JOIN users u ON u.id=COALESCE(ad.created_by_user_id,ad.user_id) WHERE ad.user_id=? AND ad.occurred_at>=? AND ad.occurred_at<? ORDER BY ad.occurred_at DESC");
+$ad=db()->prepare("SELECT ad.*,a.name account,a.icon account_icon,u.name actor_name FROM account_adjustments ad JOIN financial_accounts a ON a.id=ad.account_id LEFT JOIN users u ON u.id=COALESCE(ad.created_by_user_id,ad.user_id) WHERE ad.user_id=? AND ad.voided_at IS NULL AND ad.occurred_at>=? AND ad.occurred_at<? ORDER BY ad.occurred_at DESC");
 $ad->execute([$uid,$s,$e2]);$adjustments=$ad->fetchAll();
 
 try{$savingsRows=FinanceService::savingsHistory($uid,500,$s,$e2);}catch(Throwable $e){$savingsRows=[];error_log('[MiDinero movimientos ahorro] '.$e->getMessage());}
@@ -27,7 +27,7 @@ try{
         LEFT JOIN transactions t ON t.id=fa.source_transaction_id AND t.user_id=fa.user_id
         LEFT JOIN financial_accounts a ON a.id=t.account_id AND a.user_id=fa.user_id
         LEFT JOIN users u ON u.id=COALESCE(fa.created_by_user_id,fa.user_id)
-        WHERE fa.user_id=? AND fa.occurred_at>=? AND fa.occurred_at<?
+        WHERE fa.user_id=? AND fa.voided_at IS NULL AND fa.occurred_at>=? AND fa.occurred_at<?
         ORDER BY fa.occurred_at DESC,fa.id DESC");
     $fq->execute([$uid,$s,$e2]);
     foreach($fq->fetchAll() as $fr){

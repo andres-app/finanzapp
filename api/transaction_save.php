@@ -80,6 +80,15 @@ try {
     $st = $pdo->prepare('INSERT INTO transactions(user_id,created_by_user_id,type,category_id,concept_id,account_id,fund_id,amount,occurred_at,description,payment_method,is_ant_expense) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)');
     $st->execute([$uid,actual_user_id(),$type,$catId,$conceptId,$accountId,$fundId,$amount,$occurred,trim((string)($d['description']??'')),trim((string)($d['payment_method']??'')),$isAnt ? 1 : 0]);
     $id = (int)$pdo->lastInsertId();
+    FinanceAudit::record(
+        $uid,'transaction_created','transaction',$id,
+        $type==='income'?'Ingreso registrado':'Gasto registrado',
+        ($con['name']??$cat['name']).' · S/ '.number_format($amount,2),
+        null,
+        ['type'=>$type,'amount'=>$amount,'category'=>$cat['name'],'concept'=>$con['name']??null,'account_id'=>$accountId,'fund_id'=>$fundId,'occurred_at'=>$occurred],
+        ['period'=>substr($occurred,0,7)],
+        true
+    );
     $pdo->commit();
 
     emit_event($uid,'transaction_created',['id'=>$id]);

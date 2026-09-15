@@ -74,6 +74,11 @@ try{
         WHERE mp.id=? AND mp.user_id=? LIMIT 1");
     $fresh->execute([$id,$uid]);
     $row=$fresh->fetch();
+    FinanceAudit::record(
+        $uid,'monthly_payment_updated','monthly_payment',$id,'Compromiso mensual actualizado',
+        $p['name'].' · '.($action==='skip'?'omitido este mes':($action==='restore'?'restaurado':($action==='reset'?'restablecido al valor fijo':'monto o fecha ajustados'))),
+        $p,$row,['period'=>$period,'action'=>$action],false
+    );
     $pdo->commit();
 
     emit_event($uid,'payment_month_updated',[

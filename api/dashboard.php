@@ -40,7 +40,7 @@ function ensure_monthly_payments_safe(int $uid, string $period): void {
         $updatePending=db()->prepare("UPDATE monthly_payments SET due_date=?,amount=?
             WHERE user_id=? AND recurring_id=? AND period=? AND status='pending'");
         $findPaymentTx=db()->prepare("SELECT t.id,t.occurred_at FROM transactions t
-            WHERE t.user_id=? AND t.type='expense' AND t.category_id=? AND t.concept_id=?
+            WHERE t.user_id=? AND t.voided_at IS NULL AND t.type='expense' AND t.category_id=? AND t.concept_id=?
               AND t.occurred_at>=? AND t.occurred_at<?
               AND NOT EXISTS (
                 SELECT 1 FROM monthly_payments used_mp
@@ -124,36 +124,36 @@ try {
             COALESCE(SUM(CASE WHEN type='income' THEN amount ELSE 0 END),0) income,
             COALESCE(SUM(CASE WHEN type='expense' THEN amount ELSE 0 END),0) expense,
             COALESCE(SUM(CASE WHEN type='expense' AND is_ant_expense=1 THEN amount ELSE 0 END),0) ant
-            FROM transactions WHERE user_id=? AND occurred_at>=? AND occurred_at<?");
+            FROM transactions WHERE user_id=? AND voided_at IS NULL AND occurred_at>=? AND occurred_at<?");
         $sum->execute([$uid,$start,$end]);$cur=$sum->fetch()?:['income'=>0,'expense'=>0,'ant'=>0];
         $sum->execute([$uid,$pStart,$pEnd]);$prev=$sum->fetch()?:['income'=>0,'expense'=>0,'ant'=>0];
 
         $openingQ=db()->prepare("SELECT
             COALESCE((SELECT SUM(opening_balance) FROM financial_accounts WHERE user_id=? AND active=1),0)
-            + COALESCE((SELECT SUM(CASE WHEN type='income' THEN amount ELSE -amount END) FROM transactions WHERE user_id=? AND occurred_at<?),0)");
+            + COALESCE((SELECT SUM(CASE WHEN type='income' THEN amount ELSE -amount END) FROM transactions WHERE user_id=? AND voided_at IS NULL AND occurred_at<?),0)");
         $openingQ->execute([$uid,$uid,$start]);
         $opening=(float)$openingQ->fetchColumn();
 
         $accountsQ=db()->prepare("SELECT a.id,a.name,a.account_type,a.icon,a.color,a.opening_balance,
             a.opening_balance
-            + COALESCE((SELECT SUM(CASE WHEN t.type='income' THEN t.amount ELSE -t.amount END) FROM transactions t WHERE t.user_id=a.user_id AND t.account_id=a.id),0)
-            + COALESCE((SELECT SUM(tr.amount) FROM account_transfers tr WHERE tr.user_id=a.user_id AND tr.to_account_id=a.id),0)
-            - COALESCE((SELECT SUM(tr.amount) FROM account_transfers tr WHERE tr.user_id=a.user_id AND tr.from_account_id=a.id),0) balance
+            + COALESCE((SELECT SUM(CASE WHEN t.type='income' THEN t.amount ELSE -t.amount END) FROM transactions t WHERE t.user_id=a.user_id AND t.account_id=a.id AND t.voided_at IS NULL),0)
+            + COALESCE((SELECT SUM(tr.amount) FROM account_transfers tr WHERE tr.user_id=a.user_id AND tr.to_account_id=a.id AND tr.voided_at IS NULL),0)
+            - COALESCE((SELECT SUM(tr.amount) FROM account_transfers tr WHERE tr.user_id=a.user_id AND tr.from_account_id=a.id AND tr.voided_at IS NULL),0) balance
             FROM financial_accounts a WHERE a.user_id=? AND a.active=1 ORDER BY a.id");
         $accountsQ->execute([$uid]);$accounts=$accountsQ->fetchAll();
 
         $fundsQ=db()->prepare("SELECT f.id,f.name,f.icon,f.color,f.target_amount,
             CASE WHEN LOWER(TRIM(f.name))='ahorro' OR f.name LIKE '__SAV7__%' THEN -1 ELSE NULL END savings_goal_id,
-            COALESCE((SELECT SUM(fa.amount) FROM fund_allocations fa WHERE fa.user_id=f.user_id AND fa.fund_id=f.id),0) allocated_net,
-            COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id=f.user_id AND t.fund_id=f.id AND t.type='expense'),0) spent,
-            COALESCE((SELECT SUM(fa.amount) FROM fund_allocations fa WHERE fa.user_id=f.user_id AND fa.fund_id=f.id),0)
-             - COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id=f.user_id AND t.fund_id=f.id AND t.type='expense'),0) available
+            COALESCE((SELECT SUM(fa.amount) FROM fund_allocations fa WHERE fa.user_id=f.user_id AND fa.fund_id=f.id AND fa.voided_at IS NULL),0) allocated_net,
+            COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id=f.user_id AND t.fund_id=f.id AND t.type='expense' AND t.voided_at IS NULL),0) spent,
+            COALESCE((SELECT SUM(fa.amount) FROM fund_allocations fa WHERE fa.user_id=f.user_id AND fa.fund_id=f.id AND fa.voided_at IS NULL),0)
+             - COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id=f.user_id AND t.fund_id=f.id AND t.type='expense' AND t.voided_at IS NULL),0) available
             FROM funds f WHERE f.user_id=? AND f.active=1 ORDER BY f.id");
         $fundsQ->execute([$uid]);$funds=$fundsQ->fetchAll();
 
         $cat=db()->prepare("SELECT c.id,c.name,c.icon,c.color,SUM(t.amount) total
             FROM transactions t JOIN categories c ON c.id=t.category_id
-            WHERE t.user_id=? AND t.type='expense' AND t.occurred_at>=? AND t.occurred_at<?
+            WHERE t.user_id=? AND t.voided_at IS NULL AND t.type='expense' AND t.occurred_at>=? AND t.occurred_at<?
             GROUP BY c.id,c.name,c.icon,c.color ORDER BY total DESC LIMIT 8");
         $cat->execute([$uid,$start,$end]);
 
@@ -161,13 +161,13 @@ try {
             COALESCE(SUM(CASE WHEN type='income' THEN amount ELSE 0 END),0) income,
             COALESCE(SUM(CASE WHEN type='expense' THEN amount ELSE 0 END),0) expense,
             0 adjustment
-            FROM transactions WHERE user_id=? AND occurred_at>=? AND occurred_at<?
+            FROM transactions WHERE user_id=? AND voided_at IS NULL AND occurred_at>=? AND occurred_at<?
             GROUP BY DATE(occurred_at) ORDER BY d");
         $daily->execute([$uid,$start,$end]);
 
         $ant=db()->prepare("SELECT COALESCE(co.name,c.name) name,c.icon,SUM(t.amount) total,COUNT(*) qty
             FROM transactions t JOIN categories c ON c.id=t.category_id LEFT JOIN concepts co ON co.id=t.concept_id
-            WHERE t.user_id=? AND t.type='expense' AND t.is_ant_expense=1 AND t.occurred_at>=? AND t.occurred_at<?
+            WHERE t.user_id=? AND t.voided_at IS NULL AND t.type='expense' AND t.is_ant_expense=1 AND t.occurred_at>=? AND t.occurred_at<?
             GROUP BY name,c.icon ORDER BY total DESC LIMIT 6");
         $ant->execute([$uid,$start,$end]);
 
@@ -204,7 +204,7 @@ try {
             FROM transactions t JOIN categories c ON c.id=t.category_id LEFT JOIN concepts co ON co.id=t.concept_id
             LEFT JOIN financial_accounts a ON a.id=t.account_id LEFT JOIN funds f ON f.id=t.fund_id
             LEFT JOIN users u ON u.id=COALESCE(t.created_by_user_id,t.user_id)
-            WHERE t.user_id=? ORDER BY t.id DESC LIMIT 10");
+            WHERE t.user_id=? AND t.voided_at IS NULL ORDER BY t.id DESC LIMIT 10");
         $recent->execute([$uid]);
 
         $income=(float)$cur['income'];$expense=(float)$cur['expense'];$monthNet=$income-$expense;

@@ -33,6 +33,14 @@ try{
     $st=$pdo->prepare('INSERT INTO account_transfers(user_id,created_by_user_id,from_account_id,to_account_id,amount,occurred_at,description) VALUES(?,?,?,?,?,?,?)');
     $st->execute([$uid,actual_user_id(),$from,$to,$amount,$occurred,trim((string)($d['description']??''))]);
     $id=(int)$pdo->lastInsertId();
+    $names=$pdo->prepare('SELECT id,name FROM financial_accounts WHERE user_id=? AND id IN (?,?)');
+    $names->execute([$uid,$from,$to]);$nameMap=[];foreach($names->fetchAll() as $a)$nameMap[(int)$a['id']]=$a['name'];
+    FinanceAudit::record(
+        $uid,'account_transfer_created','account_transfer',$id,'Transferencia entre cuentas',
+        ($nameMap[$from]??'Cuenta').' → '.($nameMap[$to]??'Cuenta').' · S/ '.number_format($amount,2),
+        null,['from_account_id'=>$from,'to_account_id'=>$to,'amount'=>$amount,'occurred_at'=>$occurred,'description'=>trim((string)($d['description']??''))],
+        ['period'=>substr($occurred,0,7)],true
+    );
     $pdo->commit();
     emit_event($uid,'account_transfer',['id'=>$id]);
     json_response(['ok'=>true,'id'=>$id]);

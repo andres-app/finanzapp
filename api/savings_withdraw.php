@@ -42,14 +42,18 @@ try{
     $st->execute(array_merge([$uid],$ids));
     if(count($st->fetchAll())!==count($ids))throw new DomainException('Una de las cuentas no es válida.');
 
+    $transferId=0;
     if($from!==$to){
         $tr=$pdo->prepare('INSERT INTO account_transfers(user_id,created_by_user_id,from_account_id,to_account_id,amount,occurred_at,description) VALUES(?,?,?,?,?,?,?)');
         $tr->execute([$uid,actual_user_id(),$from,$to,$amount,$occurred,'Retiro de ahorro'.($goalId>0?' · '.$goalName:'')]);
+        $transferId=(int)$pdo->lastInsertId();
     }
 
     $marker=SavingsSchema::marker('withdrawal',$goalId,$from,$to,$note);
     $fa=$pdo->prepare('INSERT INTO fund_allocations(user_id,created_by_user_id,fund_id,amount,occurred_at,note) VALUES(?,?,?,?,?,?)');
     $fa->execute([$uid,actual_user_id(),$fundId,-$amount,$occurred,$marker]);
+    $allocationId=(int)$pdo->lastInsertId();
+    FinanceAudit::record($uid,'savings_withdrawal','savings_movement',$allocationId,'Retiro de ahorro',$goalName.' · S/ '.number_format($amount,2),null,['goal_id'=>$goalId,'goal_name'=>$goalName,'amount'=>$amount,'from_account_id'=>$from,'to_account_id'=>$to,'transfer_id'=>$transferId,'occurred_at'=>$occurred],['period'=>substr($occurred,0,7)],false);
 
     $pdo->commit();
     try{emit_event($uid,'savings_withdrawal',['goal_id'=>$goalId,'amount'=>$amount,'account_id'=>$from]);}catch(Throwable $e){}

@@ -2,7 +2,7 @@
 class FinanceSchema {
     public static function ensure(int $userId): void {
         static $done = [];
-        $version='2026-09-15-smart-monthly-payments-v1';
+        $version='2026-09-15-audit-reversal-month-close-v2';
         if (isset($done[$userId]) || (isset($_SESSION['finance_schema_version']) && $_SESSION['finance_schema_version']===$version)) return;
         $pdo = db();
 
@@ -141,6 +141,63 @@ class FinanceSchema {
         self::addColumnIfMissing('transactions', 'fund_id', "INT UNSIGNED DEFAULT NULL AFTER account_id");
         self::addColumnIfMissing('recurring_payments', 'fund_id', "INT UNSIGNED DEFAULT NULL AFTER concept_id");
 
+        // Fase 3: anulación segura. Nada se borra físicamente: las operaciones
+        // anuladas quedan visibles para auditoría, pero dejan de afectar saldos.
+        foreach (['transactions','account_transfers','account_adjustments','fund_allocations'] as $voidTable) {
+            if (self::tableExists($voidTable)) {
+                self::addColumnIfMissing($voidTable, 'voided_at', "DATETIME DEFAULT NULL");
+                self::addColumnIfMissing($voidTable, 'voided_by_user_id', "INT UNSIGNED DEFAULT NULL");
+                self::addColumnIfMissing($voidTable, 'void_reason', "VARCHAR(255) DEFAULT NULL");
+            }
+        }
+
+        // Auditoría y cierre mensual: las tablas se crean con la estructura mínima
+        // necesaria y sin claves foráneas obligatorias. En hosting compartido algunas
+        // configuraciones de MySQL/MariaDB bloquean la petición si una FK no puede
+        // crearse; la integridad de usuario ya se valida desde la aplicación.
+        $pdo->exec("CREATE TABLE IF NOT EXISTS finance_audit_log (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id INT UNSIGNED NOT NULL,
+            actor_user_id INT UNSIGNED DEFAULT NULL,
+            action VARCHAR(80) NOT NULL,
+            entity_type VARCHAR(80) NOT NULL,
+            entity_id BIGINT UNSIGNED DEFAULT NULL,
+            title VARCHAR(180) NOT NULL,
+            summary VARCHAR(500) DEFAULT NULL,
+            before_json LONGTEXT NULL,
+            after_json LONGTEXT NULL,
+            metadata_json LONGTEXT NULL,
+            reversible TINYINT(1) NOT NULL DEFAULT 0,
+            reversed_at DATETIME DEFAULT NULL,
+            reversed_by_user_id INT UNSIGNED DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY(id),
+            KEY idx_audit_user_date(user_id,created_at),
+            KEY idx_audit_actor_date(actor_user_id,created_at),
+            KEY idx_audit_entity(user_id,entity_type,entity_id),
+            KEY idx_audit_reversible(user_id,reversible,reversed_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        $pdo->exec("CREATE TABLE IF NOT EXISTS monthly_closures (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id INT UNSIGNED NOT NULL,
+            period CHAR(7) NOT NULL,
+            snapshot_json LONGTEXT NOT NULL,
+            snapshot_hash CHAR(64) NOT NULL DEFAULT '',
+            notes VARCHAR(500) DEFAULT NULL,
+            closed_by_user_id INT UNSIGNED DEFAULT NULL,
+            closed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            reopened_at DATETIME DEFAULT NULL,
+            reopened_by_user_id INT UNSIGNED DEFAULT NULL,
+            PRIMARY KEY(id),
+            UNIQUE KEY uq_monthly_closure(user_id,period),
+            KEY idx_monthly_closure_date(user_id,closed_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        if (self::tableExists('monthly_closures')) {
+            self::addColumnIfMissing('monthly_closures', 'snapshot_hash', "CHAR(64) NOT NULL DEFAULT '' AFTER snapshot_json");
+        }
+        self::backfillAuditHistory($userId);
+
         // Pagos mensuales inteligentes: el monto/fecha del mes puede separarse del
         // valor recurrente, admite pagos parciales y permite omitir un mes sin
         // modificar los meses siguientes.
@@ -178,11 +235,17 @@ class FinanceSchema {
 
         self::addIndexIfMissing('transactions', 'idx_tx_account', 'account_id');
         self::addIndexIfMissing('transactions', 'idx_tx_fund', 'fund_id');
+        if (self::tableExists('transactions')) self::addIndexIfMissing('transactions', 'idx_tx_voided', 'user_id,voided_at');
+        if (self::tableExists('account_transfers')) self::addIndexIfMissing('account_transfers', 'idx_transfer_voided', 'user_id,voided_at');
+        if (self::tableExists('account_adjustments')) self::addIndexIfMissing('account_adjustments', 'idx_adjustment_voided', 'user_id,voided_at');
+        if (self::tableExists('fund_allocations')) self::addIndexIfMissing('fund_allocations', 'idx_allocation_voided', 'user_id,voided_at');
         self::addIndexIfMissing('recurring_payments', 'idx_rec_fund', 'fund_id');
         if (self::tableExists('recurring_incomes')) self::addIndexIfMissing('recurring_incomes', 'idx_ri_account', 'account_id');
 
         self::addForeignIfMissing('transactions', 'fk_tx_account', 'FOREIGN KEY (account_id) REFERENCES financial_accounts(id) ON DELETE SET NULL');
         self::addForeignIfMissing('transactions', 'fk_tx_fund', 'FOREIGN KEY (fund_id) REFERENCES funds(id) ON DELETE SET NULL');
+        // Las columnas de anulación funcionan sin FK. Evitamos crear estas claves
+        // durante una petición web para no provocar HTTP 500 por restricciones del hosting.
         self::addForeignIfMissing('recurring_payments', 'fk_rec_fund', 'FOREIGN KEY (fund_id) REFERENCES funds(id) ON DELETE SET NULL');
         if (self::tableExists('recurring_incomes')) self::addForeignIfMissing('recurring_incomes', 'fk_ri_account', 'FOREIGN KEY (account_id) REFERENCES financial_accounts(id) ON DELETE SET NULL');
         if (self::tableExists('monthly_payments')) {
@@ -193,7 +256,7 @@ class FinanceSchema {
             // cerrado se considera totalmente cubierto. También registramos su
             // transacción histórica como una parte para mantener la trazabilidad.
             $pdo->exec("UPDATE monthly_payments mp
-                LEFT JOIN transactions t ON t.id=mp.transaction_id AND t.user_id=mp.user_id
+                LEFT JOIN transactions t ON t.id=mp.transaction_id AND t.user_id=mp.user_id AND t.voided_at IS NULL
                 SET mp.paid_amount=CASE
                     WHEN mp.status='paid' AND mp.paid_amount=0 THEN COALESCE(t.amount,mp.amount)
                     ELSE mp.paid_amount END
@@ -207,7 +270,7 @@ class FinanceSchema {
                            COALESCE(t.created_by_user_id,t.user_id),
                            COALESCE(t.created_at,mp.created_at)
                     FROM monthly_payments mp
-                    JOIN transactions t ON t.id=mp.transaction_id AND t.user_id=mp.user_id
+                    JOIN transactions t ON t.id=mp.transaction_id AND t.user_id=mp.user_id AND t.voided_at IS NULL
                     WHERE mp.status='paid' AND mp.transaction_id IS NOT NULL");
             }
         }
@@ -248,6 +311,73 @@ class FinanceSchema {
 
         $done[$userId] = true;
         $_SESSION['finance_schema_version']=$version;
+    }
+
+    private static function backfillAuditHistory(int $userId): void {
+        $key='2026-09-15-audit-history-user-'.$userId;
+        try {
+            $st=db()->prepare('SELECT 1 FROM finance_migrations WHERE migration_key=? LIMIT 1');
+            $st->execute([$key]);
+            if($st->fetchColumn()) return;
+            $pdo=db();
+
+            // La auditoría detallada empieza con esta versión, pero mostramos también
+            // los movimientos financieros ya existentes como historial no reversible.
+            $q=$pdo->prepare("INSERT INTO finance_audit_log
+                (user_id,actor_user_id,action,entity_type,entity_id,title,summary,reversible,created_at)
+                SELECT t.user_id,COALESCE(t.created_by_user_id,t.user_id),'historical_transaction','transaction',t.id,
+                    CASE WHEN t.type='income' THEN 'Ingreso histórico' ELSE 'Gasto histórico' END,
+                    CONCAT(COALESCE(co.name,c.name,'Movimiento'),' · S/ ',CAST(t.amount AS CHAR)),0,COALESCE(t.created_at,t.occurred_at)
+                FROM transactions t
+                LEFT JOIN categories c ON c.id=t.category_id
+                LEFT JOIN concepts co ON co.id=t.concept_id
+                WHERE t.user_id=? AND NOT EXISTS (
+                    SELECT 1 FROM finance_audit_log a WHERE a.user_id=t.user_id AND a.entity_type='transaction' AND a.entity_id=t.id
+                )");
+            $q->execute([$userId]);
+
+            if(self::tableExists('account_transfers')){
+                $q=$pdo->prepare("INSERT INTO finance_audit_log
+                    (user_id,actor_user_id,action,entity_type,entity_id,title,summary,reversible,created_at)
+                    SELECT tr.user_id,COALESCE(tr.created_by_user_id,tr.user_id),'historical_transfer','account_transfer',tr.id,
+                        'Transferencia histórica',CONCAT(COALESCE(a1.name,'Cuenta'),' → ',COALESCE(a2.name,'Cuenta'),' · S/ ',CAST(tr.amount AS CHAR)),0,COALESCE(tr.created_at,tr.occurred_at)
+                    FROM account_transfers tr
+                    LEFT JOIN financial_accounts a1 ON a1.id=tr.from_account_id
+                    LEFT JOIN financial_accounts a2 ON a2.id=tr.to_account_id
+                    WHERE tr.user_id=? AND NOT EXISTS (
+                        SELECT 1 FROM finance_audit_log a WHERE a.user_id=tr.user_id AND a.entity_type='account_transfer' AND a.entity_id=tr.id
+                    )");
+                $q->execute([$userId]);
+            }
+            if(self::tableExists('account_adjustments')){
+                $q=$pdo->prepare("INSERT INTO finance_audit_log
+                    (user_id,actor_user_id,action,entity_type,entity_id,title,summary,reversible,created_at)
+                    SELECT ad.user_id,COALESCE(ad.created_by_user_id,ad.user_id),'historical_adjustment','account_adjustment',ad.id,
+                        'Ajuste histórico de cuenta',CONCAT(COALESCE(a.name,'Cuenta'),' · S/ ',CAST(ad.amount AS CHAR)),0,COALESCE(ad.created_at,ad.occurred_at)
+                    FROM account_adjustments ad LEFT JOIN financial_accounts a ON a.id=ad.account_id
+                    WHERE ad.user_id=? AND NOT EXISTS (
+                        SELECT 1 FROM finance_audit_log al WHERE al.user_id=ad.user_id AND al.entity_type='account_adjustment' AND al.entity_id=ad.id
+                    )");
+                $q->execute([$userId]);
+            }
+            if(self::tableExists('fund_allocations')){
+                $q=$pdo->prepare("INSERT INTO finance_audit_log
+                    (user_id,actor_user_id,action,entity_type,entity_id,title,summary,reversible,created_at)
+                    SELECT fa.user_id,COALESCE(fa.created_by_user_id,fa.user_id),'historical_fund_allocation','fund_allocation',fa.id,
+                        CASE WHEN fa.amount>=0 THEN 'Separación histórica en fondo' ELSE 'Liberación histórica de fondo' END,
+                        CONCAT(COALESCE(f.name,'Fondo'),' · S/ ',CAST(ABS(fa.amount) AS CHAR)),0,COALESCE(fa.created_at,fa.occurred_at)
+                    FROM fund_allocations fa LEFT JOIN funds f ON f.id=fa.fund_id
+                    WHERE fa.user_id=? AND NOT EXISTS (
+                        SELECT 1 FROM finance_audit_log a WHERE a.user_id=fa.user_id AND a.entity_type='fund_allocation' AND a.entity_id=fa.id
+                    )");
+                $q->execute([$userId]);
+            }
+            $ins=$pdo->prepare('INSERT IGNORE INTO finance_migrations(migration_key,applied_at) VALUES(?,NOW())');
+            $ins->execute([$key]);
+        } catch(Throwable $e) {
+            // La falta de un backfill histórico nunca debe bloquear el sistema.
+            error_log('[MiDinero audit backfill] '.$e->getMessage());
+        }
     }
 
     private static function applyLegacyIntegrityMigration(int $userId): void {
@@ -320,7 +450,7 @@ class FinanceSchema {
         if ($id) return $id;
 
         // Compensa movimientos históricos negativos para que la migración no arranque mostrando deuda ficticia.
-        $netSt = db()->prepare("SELECT COALESCE(SUM(CASE WHEN type='income' THEN amount ELSE -amount END),0) FROM transactions WHERE user_id=?");
+        $netSt = db()->prepare("SELECT COALESCE(SUM(CASE WHEN type='income' THEN amount ELSE -amount END),0) FROM transactions WHERE user_id=? AND voided_at IS NULL");
         $netSt->execute([$userId]);
         $net = (float)$netSt->fetchColumn();
         $opening = $net < 0 ? abs($net) : 0;
@@ -341,12 +471,12 @@ class FinanceSchema {
     }
     private static function repairNegativeFunds(int $userId): void {
         $st = db()->prepare("SELECT f.id,
-            COALESCE((SELECT SUM(fa.amount) FROM fund_allocations fa WHERE fa.user_id=f.user_id AND fa.fund_id=f.id),0) allocated,
-            COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id=f.user_id AND t.fund_id=f.id AND t.type='expense'),0) spent
+            COALESCE((SELECT SUM(fa.amount) FROM fund_allocations fa WHERE fa.user_id=f.user_id AND fa.fund_id=f.id AND fa.voided_at IS NULL),0) allocated,
+            COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id=f.user_id AND t.fund_id=f.id AND t.type='expense' AND t.voided_at IS NULL),0) spent
             FROM funds f WHERE f.user_id=?");
         $st->execute([$userId]);
         $up = db()->prepare("UPDATE transactions SET fund_id=NULL WHERE id=? AND user_id=? AND type='expense'");
-        $rows = db()->prepare("SELECT id,amount FROM transactions WHERE user_id=? AND fund_id=? AND type='expense' ORDER BY occurred_at DESC,id DESC");
+        $rows = db()->prepare("SELECT id,amount FROM transactions WHERE user_id=? AND fund_id=? AND type='expense' AND voided_at IS NULL ORDER BY occurred_at DESC,id DESC");
         foreach ($st->fetchAll() as $f) {
             $deficit = (float)$f['spent'] - (float)$f['allocated'];
             if ($deficit <= 0.005) continue;

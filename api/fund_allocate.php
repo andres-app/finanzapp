@@ -21,7 +21,7 @@ try{
     $ids=array_keys($clean); sort($ids,SORT_NUMERIC);
     $place=implode(',',array_fill(0,count($ids),'?'));
     $params=array_merge([$uid],$ids);
-    $st=$pdo->prepare("SELECT f.id FROM funds f WHERE f.user_id=? AND f.active=1 AND f.id IN ($place) ORDER BY f.id FOR UPDATE");
+    $st=$pdo->prepare("SELECT f.id,f.name FROM funds f WHERE f.user_id=? AND f.active=1 AND f.id IN ($place) ORDER BY f.id FOR UPDATE");
     $st->execute($params);$validFunds=$st->fetchAll();
     if(count($validFunds)!==count($ids))throw new DomainException('Uno de los fondos no es válido.');
     foreach($validFunds as $vf)if(SavingsSchema::isSavingsFund($uid,(int)$vf['id']))throw new DomainException('Las metas de ahorro se alimentan desde el módulo Ahorro para conservar su trazabilidad.');
@@ -32,8 +32,8 @@ try{
     if($total>$unallocated+0.005)throw new DomainException('Estás intentando separar más dinero del que tienes libre. Disponible: S/ '.number_format(max(0,$unallocated),2));
 
     if($sourceTx){
-        $src=$pdo->prepare("SELECT t.amount-COALESCE((SELECT SUM(fa.amount) FROM fund_allocations fa WHERE fa.user_id=t.user_id AND fa.source_transaction_id=t.id),0) remaining
-            FROM transactions t WHERE t.id=? AND t.user_id=? AND t.type='income' FOR UPDATE");
+        $src=$pdo->prepare("SELECT t.amount-COALESCE((SELECT SUM(fa.amount) FROM fund_allocations fa WHERE fa.user_id=t.user_id AND fa.source_transaction_id=t.id AND fa.voided_at IS NULL),0) remaining
+            FROM transactions t WHERE t.id=? AND t.user_id=? AND t.voided_at IS NULL AND t.type='income' FOR UPDATE");
         $src->execute([$sourceTx,$uid]);
         $remaining=$src->fetchColumn();
         if($remaining===false)throw new DomainException('El ingreso seleccionado no es válido.');
@@ -42,7 +42,17 @@ try{
 
     $occurred=date('Y-m-d H:i:s');
     $ins=$pdo->prepare('INSERT INTO fund_allocations(user_id,created_by_user_id,fund_id,amount,occurred_at,source_transaction_id,note) VALUES(?,?,?,?,?,?,?)');
-    foreach($clean as $fid=>$amount)$ins->execute([$uid,actual_user_id(),$fid,$amount,$occurred,$sourceTx,$note]);
+    $allocationIds=[];$fundNames=[];foreach($validFunds as $vf)$fundNames[(int)$vf['id']]=$vf['name'];
+    foreach($clean as $fid=>$amount){
+        $ins->execute([$uid,actual_user_id(),$fid,$amount,$occurred,$sourceTx,$note]);
+        $allocationIds[]=(int)$pdo->lastInsertId();
+    }
+    FinanceAudit::record(
+        $uid,'fund_allocation_created','fund_allocation_group',null,'Dinero separado en fondos',
+        'Total S/ '.number_format($total,2),
+        null,['allocations'=>$clean,'fund_names'=>$fundNames,'source_transaction_id'=>$sourceTx,'occurred_at'=>$occurred],
+        ['allocation_ids'=>$allocationIds,'period'=>substr($occurred,0,7)],true
+    );
     $pdo->commit();
     emit_event($uid,'fund_allocated',['total'=>$total]);
     json_response(['ok'=>true,'total'=>$total]);

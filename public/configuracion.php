@@ -203,8 +203,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($name === '' || !in_array($type, ['expense','income'], true)) {
                 cfg_fail('Completa correctamente los datos de la categoría.', 'categorias');
             }
+            $icon=trim($_POST['icon'] ?? '') ?: '💳';$color=$_POST['color'] ?? '#2563eb';$isAnt=!empty($_POST['is_ant_expense']) ? 1 : 0;
             $st = db()->prepare('INSERT INTO categories(user_id,name,type,icon,color,is_ant_expense) VALUES(?,?,?,?,?,?)');
-            $st->execute([$uid,$name,$type,trim($_POST['icon'] ?? '') ?: '💳',$_POST['color'] ?? '#2563eb',!empty($_POST['is_ant_expense']) ? 1 : 0]);
+            $st->execute([$uid,$name,$type,$icon,$color,$isAnt]);
+            $categoryNewId=(int)db()->lastInsertId();
+            FinanceAudit::record($uid,'category_created','category',$categoryNewId,'Categoría creada',$name,null,['name'=>$name,'type'=>$type,'icon'=>$icon,'color'=>$color,'is_ant_expense'=>$isAnt],null,false);
             emit_event($uid, 'config_changed');
             cfg_redirect('Categoría creada correctamente.', 'categorias');
         }
@@ -216,8 +219,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 cfg_fail('Completa correctamente el concepto.', 'conceptos');
             }
             $defaultAmount = trim((string)($_POST['default_amount'] ?? ''));
+            $conceptAmount=$defaultAmount !== '' ? max(0, (float)$defaultAmount) : null;$conceptAnt=!empty($_POST['is_ant_expense']) ? 1 : 0;
             $st = db()->prepare('INSERT INTO concepts(user_id,category_id,name,default_amount,is_ant_expense) VALUES(?,?,?,?,?)');
-            $st->execute([$uid,$categoryId,$name,$defaultAmount !== '' ? max(0, (float)$defaultAmount) : null,!empty($_POST['is_ant_expense']) ? 1 : 0]);
+            $st->execute([$uid,$categoryId,$name,$conceptAmount,$conceptAnt]);
+            $conceptNewId=(int)db()->lastInsertId();
+            FinanceAudit::record($uid,'concept_created','concept',$conceptNewId,'Concepto creado',$name,null,['category_id'=>$categoryId,'name'=>$name,'default_amount'=>$conceptAmount,'is_ant_expense'=>$conceptAnt],null,false);
             emit_event($uid, 'config_changed');
             cfg_redirect('Concepto creado correctamente.', 'conceptos');
         }
@@ -239,9 +245,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $linkedIncome->execute([$uid, $conceptId]);
             if ($linkedIncome->fetchColumn()) cfg_fail('Ese concepto pertenece a un ingreso fijo. Edítalo desde “Ingresos fijos”.', 'ingresos-fijos');
 
-            $amount = $defaultAmount !== '' ? max(0, (float)$defaultAmount) : null;
+            $beforeSt=db()->prepare('SELECT id,category_id,name,default_amount,is_ant_expense FROM concepts WHERE id=? AND user_id=? AND active=1 LIMIT 1');
+            $beforeSt->execute([$conceptId,$uid]);$beforeConcept=$beforeSt->fetch();
+            $amount = $defaultAmount !== '' ? max(0, (float)$defaultAmount) : null;$conceptAnt=!empty($_POST['is_ant_expense']) ? 1 : 0;
             $st = db()->prepare('UPDATE concepts SET category_id=?,name=?,default_amount=?,is_ant_expense=? WHERE id=? AND user_id=? AND active=1');
-            $st->execute([$categoryId,$name,$amount,!empty($_POST['is_ant_expense']) ? 1 : 0,$conceptId,$uid]);
+            $st->execute([$categoryId,$name,$amount,$conceptAnt,$conceptId,$uid]);
+            FinanceAudit::record($uid,'concept_updated','concept',$conceptId,'Concepto actualizado',$name,$beforeConcept,['id'=>$conceptId,'category_id'=>$categoryId,'name'=>$name,'default_amount'=>$amount,'is_ant_expense'=>$conceptAnt],null,false);
             emit_event($uid, 'config_changed', ['concept_id' => $conceptId]);
             cfg_redirect('Guardado automáticamente.', 'conceptos', ['concept_id'=>$conceptId]);
         }
@@ -268,6 +277,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $st = $pdo->prepare('INSERT INTO recurring_payments(user_id,category_id,concept_id,fund_id,name,amount,due_day,icon) VALUES(?,?,?,?,?,?,?,?)');
             $st->execute([$uid,$categoryId,$conceptId,$fundId,$name,$amount,$dueDay,$icon]);
+            $recurringNewId=(int)$pdo->lastInsertId();
+            FinanceAudit::record($uid,'recurring_payment_created','recurring_payment',$recurringNewId,'Pago fijo creado',$name.' · S/ '.number_format($amount,2),null,['category_id'=>$categoryId,'concept_id'=>$conceptId,'fund_id'=>$fundId,'name'=>$name,'amount'=>$amount,'due_day'=>$dueDay,'icon'=>$icon],null,false);
             $pdo->commit();
             emit_event($uid, 'config_changed');
             cfg_redirect('Pago fijo creado. El concepto quedó vinculado automáticamente.', 'pagos');
@@ -287,7 +298,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo = db();
             $pdo->beginTransaction();
-            $get = $pdo->prepare('SELECT concept_id FROM recurring_payments WHERE id=? AND user_id=? AND active=1 FOR UPDATE');
+            $get = $pdo->prepare('SELECT id,category_id,concept_id,fund_id,name,amount,due_day,icon FROM recurring_payments WHERE id=? AND user_id=? AND active=1 FOR UPDATE');
             $get->execute([$recurringId, $uid]);
             $row = $get->fetch();
             if (!$row) {
@@ -305,6 +316,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $st = $pdo->prepare('UPDATE recurring_payments SET category_id=?,concept_id=?,fund_id=?,name=?,amount=?,due_day=?,icon=? WHERE id=? AND user_id=? AND active=1');
             $st->execute([$categoryId,$conceptId,$fundId,$name,$amount,$dueDay,$icon,$recurringId,$uid]);
+            FinanceAudit::record($uid,'recurring_payment_updated','recurring_payment',$recurringId,'Pago fijo actualizado',$name.' · S/ '.number_format($amount,2),$row,['id'=>$recurringId,'category_id'=>$categoryId,'concept_id'=>$conceptId,'fund_id'=>$fundId,'name'=>$name,'amount'=>$amount,'due_day'=>$dueDay,'icon'=>$icon],null,false);
 
             // El registro maestro es la fuente de verdad. Primero confirmamos el cambio.
             $pdo->commit();
@@ -351,6 +363,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $st = $pdo->prepare('INSERT INTO recurring_incomes(user_id,category_id,concept_id,account_id,name,amount,income_day,icon) VALUES(?,?,?,?,?,?,?,?)');
             $st->execute([$uid,$categoryId,$conceptId,$accountId,$name,$amount,$incomeDay,$icon]);
+            $incomeNewId=(int)$pdo->lastInsertId();
+            FinanceAudit::record($uid,'recurring_income_created','recurring_income',$incomeNewId,'Ingreso fijo creado',$name.' · S/ '.number_format($amount,2),null,['category_id'=>$categoryId,'concept_id'=>$conceptId,'account_id'=>$accountId,'name'=>$name,'amount'=>$amount,'income_day'=>$incomeDay,'icon'=>$icon],null,false);
             $pdo->commit();
             emit_event($uid, 'config_changed');
             cfg_redirect('Ingreso fijo creado. El concepto quedó vinculado automáticamente.', 'ingresos-fijos');
@@ -370,7 +384,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo = db();
             $pdo->beginTransaction();
-            $get = $pdo->prepare('SELECT concept_id FROM recurring_incomes WHERE id=? AND user_id=? AND active=1 FOR UPDATE');
+            $get = $pdo->prepare('SELECT id,category_id,concept_id,account_id,name,amount,income_day,icon FROM recurring_incomes WHERE id=? AND user_id=? AND active=1 FOR UPDATE');
             $get->execute([$recurringId, $uid]);
             $row = $get->fetch();
             if (!$row) {
@@ -388,6 +402,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $st = $pdo->prepare('UPDATE recurring_incomes SET category_id=?,concept_id=?,account_id=?,name=?,amount=?,income_day=?,icon=? WHERE id=? AND user_id=? AND active=1');
             $st->execute([$categoryId,$conceptId,$accountId,$name,$amount,$incomeDay,$icon,$recurringId,$uid]);
+            FinanceAudit::record($uid,'recurring_income_updated','recurring_income',$recurringId,'Ingreso fijo actualizado',$name.' · S/ '.number_format($amount,2),$row,['id'=>$recurringId,'category_id'=>$categoryId,'concept_id'=>$conceptId,'account_id'=>$accountId,'name'=>$name,'amount'=>$amount,'income_day'=>$incomeDay,'icon'=>$icon],null,false);
 
             // Igual que con pagos fijos, la expectativa mensual es derivada y no debe
             // bloquear la edición del ingreso recurrente.
@@ -411,6 +426,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $st = db()->prepare('INSERT INTO goals(user_id,period,name,type,target_amount) VALUES(?,?,?,?,?)');
             $st->execute([$uid,$period,$name,$type,$target]);
+            $goalNewId=(int)db()->lastInsertId();
+            FinanceAudit::record($uid,'goal_created','goal',$goalNewId,'Meta financiera creada',$name.' · S/ '.number_format($target,2),null,['period'=>$period,'name'=>$name,'type'=>$type,'target_amount'=>$target],null,false);
             if($type==='savings') {
                 // La cuenta física se elige al realizar cada aporte. Solo creamos/sincronizamos
                 // el fondo virtual asociado a la meta.
@@ -423,26 +440,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($action === 'household_invite') {
             $email = trim($_POST['member_email'] ?? '');
             $member = HouseholdSchema::linkExistingUser(actual_user_id(), $email);
+            FinanceAudit::record($uid,'household_member_added','household_member',(int)$member['id'],'Integrante agregado al hogar',$member['name'].' · '.$member['email'],null,['member_user_id'=>(int)$member['id'],'name'=>$member['name'],'email'=>$member['email']],null,false);
             emit_event($uid, 'household_changed', ['member_user_id'=>(int)$member['id']]);
             cfg_redirect('Integrante agregado. Ya puede ver y registrar en este mismo hogar.', 'hogar');
         }
 
         if ($action === 'household_remove') {
-            HouseholdSchema::removeMember(actual_user_id(), (int)($_POST['member_user_id'] ?? 0));
+            $removedId=(int)($_POST['member_user_id'] ?? 0);
+            $membersBefore=HouseholdSchema::membersForUser(actual_user_id());$removedName='Integrante';foreach($membersBefore as $mb)if((int)$mb['user_id']===$removedId){$removedName=$mb['name'];break;}
+            HouseholdSchema::removeMember(actual_user_id(), $removedId);
+            FinanceAudit::record($uid,'household_member_removed','household_member',$removedId,'Integrante retirado del hogar',$removedName,null,['member_user_id'=>$removedId,'name'=>$removedName],null,false);
             emit_event($uid, 'household_changed');
             cfg_redirect('Integrante retirado del hogar.', 'hogar');
         }
 
         if ($action === 'household_rename') {
-            HouseholdSchema::rename(actual_user_id(), trim($_POST['household_name'] ?? ''));
+            $ctxBefore=HouseholdSchema::contextForUser(actual_user_id());$newHouseholdName=trim($_POST['household_name'] ?? '');
+            HouseholdSchema::rename(actual_user_id(), $newHouseholdName);
+            FinanceAudit::record($uid,'household_renamed','household',(int)$ctxBefore['household_id'],'Hogar renombrado',$newHouseholdName,['name'=>$ctxBefore['household_name']],['name'=>$newHouseholdName],null,false);
             cfg_redirect('Nombre del hogar actualizado.', 'hogar');
         }
 
         if ($action === 'user') {
             $email = trim($_POST['notify_email'] ?? '');
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) cfg_fail('Ingresa un correo válido.', 'notificaciones');
+            $notifyIncome=!empty($_POST['notify_on_income']) ? 1 : 0;$notifyExpense=!empty($_POST['notify_on_expense']) ? 1 : 0;
+            $beforeUser=current_user();
             $st = db()->prepare('UPDATE users SET notify_email=?,notify_on_income=?,notify_on_expense=? WHERE id=?');
-            $st->execute([$email,!empty($_POST['notify_on_income']) ? 1 : 0,!empty($_POST['notify_on_expense']) ? 1 : 0,actual_user_id()]);
+            $st->execute([$email,$notifyIncome,$notifyExpense,actual_user_id()]);
+            FinanceAudit::record($uid,'notification_settings_updated','user',actual_user_id(),'Notificaciones actualizadas',$email,['notify_email'=>$beforeUser['notify_email']??null,'notify_on_income'=>$beforeUser['notify_on_income']??null,'notify_on_expense'=>$beforeUser['notify_on_expense']??null],['notify_email'=>$email,'notify_on_income'=>$notifyIncome,'notify_on_expense'=>$notifyExpense],null,false);
             cfg_redirect('Preferencias guardadas automáticamente.', 'notificaciones');
         }
     } catch (Throwable $e) {

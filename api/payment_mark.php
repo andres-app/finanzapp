@@ -99,6 +99,16 @@ try {
     ]);
     if ($up->rowCount() < 1) throw new RuntimeException('El pago cambió mientras se procesaba.');
 
+    FinanceAudit::record(
+        $uid,$isComplete?'monthly_payment_completed':'monthly_payment_partial','transaction',$txId,
+        $isComplete?'Pago fijo completado':'Abono a pago fijo',
+        $p['name'].' · S/ '.number_format($amount,2).($remainingAfter>0?' · falta S/ '.number_format($remainingAfter,2):''),
+        null,
+        ['monthly_payment_id'=>$id,'name'=>$p['name'],'amount'=>$amount,'paid_amount'=>$newPaid,'remaining_amount'=>$remainingAfter,'account_id'=>$accountId,'fund_id'=>$fundId,'period'=>$p['period']],
+        ['monthly_payment_id'=>$id,'period'=>$p['period'],'payment_part'=>true],
+        true
+    );
+
     $pdo->commit();
     emit_event($uid,$isComplete?'payment_paid':'payment_partial',[
         'id'=>$id,'transaction_id'=>$txId,'amount'=>$amount,'reference_amount'=>$referenceAmount,
