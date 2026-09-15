@@ -61,9 +61,12 @@ function page_top(string $title, string $active = 'dashboard'): void {
             <a class="mobile-quick-add" href="<?=e(app_url('dashboard?action=choose'))?>" aria-label="Registrar">＋</a>
             <span class="live-dot"><i></i> vivo</span>
         </header>
-        <section class="content">
 <?php
     echo '<script>window.APP={csrf:' . json_encode(csrf_token()) . ',apiBase:' . json_encode($apiBase) . ',routes:{dashboard:' . json_encode(app_url('dashboard')) . ',movimientos:' . json_encode(app_url('movimientos')) . ',cuentas:' . json_encode(app_url('cuentas')) . ',fondos:' . json_encode(app_url('fondos')) . ',ahorro:' . json_encode(app_url('ahorro')) . ',presupuesto:' . json_encode(app_url('ahorro')) . ',configuracion:' . json_encode(app_url('configuracion')) . '}};</script>';
+    echo '<script src="' . e(app_url('assets/js/app-shell.js')) . '?v=' . e((string)@filemtime(__DIR__.'/../assets/js/app-shell.js')) . '"></script>';
+?>
+        <section class="content" data-page="<?=e($active)?>">
+<?php
 }
 
 function profile_card(): void {

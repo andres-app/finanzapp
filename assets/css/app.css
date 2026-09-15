@@ -1375,3 +1375,17 @@ body.settings-modal-open{overflow:hidden}
   .accounts-min-grid{gap:16px}
   .account-min-card{padding:17px;gap:14px}
 }
+
+/* Navegación dinámica: el sidebar y la conexión realtime permanecen montados. */
+body.app-navigating .content {
+  opacity: .58;
+  pointer-events: none;
+  transition: opacity .12s ease;
+}
+body:not(.app-navigating) .content {
+  transition: opacity .12s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  body.app-navigating .content,
+  body:not(.app-navigating) .content { transition: none; }
+}

@@ -1,4 +1,5 @@
-(() => {
+window.MiDineroRegister('dashboard', () => {
+  const pageAbort = new AbortController();
   const $ = s => document.querySelector(s);
   const $$ = s => [...document.querySelectorAll(s)];
   const money = n => 'S/ ' + Number(n || 0).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -43,7 +44,12 @@
   let config=window.FINANCE_FORM_DATA||{categories:[],concepts:[],accounts:[],funds:[],income_defaults:[]};
   let currentPayment=null, currentData=null, loading=false, queued=false, timer=null, toastTimer=null;
 
-  async function json(url,opt){const r=await fetch(url,opt),j=await r.json();if(!r.ok||j.ok===false)throw new Error(j.message||'No se pudo completar la acción');return j;}
+  async function json(url,opt={}){
+    const options={...opt,signal:opt?.signal||pageAbort.signal};
+    const method=String(options.method||'GET').toUpperCase();
+    if(method!=='GET'&&method!=='HEAD') options.headers=window.MiDinero?.clientHeaders(options.headers||{})||options.headers;
+    const r=await fetch(url,options),j=await r.json();if(!r.ok||j.ok===false)throw new Error(j.message||'No se pudo completar la acción');return j;
+  }
   function esc(v){return String(v??'').replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll("'",'&#39;').replaceAll('<','&lt;').replaceAll('>','&gt;');}
   function safeColor(v,fallback='#6b7280'){return /^#[0-9a-f]{6}$/i.test(String(v||''))?String(v):fallback;}
   function periodLabel(p){const [y,m]=p.split('-');const n=['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];return `${n[Number(m)]} ${y}`;}
@@ -125,15 +131,17 @@
   });}
 
   async function loadConfig(){
-    try{const fresh=await json(api('config.php'));if(fresh&&Array.isArray(fresh.categories)){config=fresh;populateQuickForms();renderPayOptions();}}
-    catch(err){console.warn('No se pudo refrescar configuración:',err);populateQuickForms();renderPayOptions();}
+    try{const fresh=await json(api('config.php'));if(pageAbort.signal.aborted)return;if(fresh&&Array.isArray(fresh.categories)){config=fresh;populateQuickForms();renderPayOptions();}}
+    catch(err){if(err?.name==='AbortError')return;console.warn('No se pudo refrescar configuración:',err);populateQuickForms();renderPayOptions();}
   }
 
   async function load(){
+    if(pageAbort.signal.aborted)return;
     if(loading){queued=true;return}
     loading=true;
-    try{const p=$('#period').value;const j=await json(api('dashboard.php')+'?period='+encodeURIComponent(p));currentData=j.data;render(j.data);}
-    finally{loading=false;if(queued){queued=false;load();}}
+    try{const periodEl=$('#period');if(!periodEl)return;const p=periodEl.value;const j=await json(api('dashboard.php')+'?period='+encodeURIComponent(p));if(pageAbort.signal.aborted)return;currentData=j.data;render(j.data);}
+    catch(err){if(err?.name!=='AbortError')throw err;}
+    finally{loading=false;if(queued&&!pageAbort.signal.aborted){queued=false;load();}}
   }
 
   function render(d){
@@ -324,8 +332,8 @@
   $$('[data-quick-concept-close]').forEach(btn=>btn.addEventListener('click',closeQuickConceptCreator));
   quickConceptModal?.addEventListener('click',e=>{if(e.target===quickConceptModal)closeQuickConceptCreator();});
   Object.entries(actionModals).forEach(([action,modal])=>modal?.addEventListener('click',e=>{if(e.target===modal)closeActionModal(action);}));
-  document.addEventListener('click',e=>{if(registerMenu?.classList.contains('show')&&!e.target.closest('.register-launcher'))closeRegisterMenu();});
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(quickConceptModal?.classList.contains('show'))closeQuickConceptCreator();else{closeRegisterMenu();closeAllActionModals();}}});
+  document.addEventListener('click',e=>{if(registerMenu?.classList.contains('show')&&!e.target.closest('.register-launcher'))closeRegisterMenu();},{signal:pageAbort.signal});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(quickConceptModal?.classList.contains('show'))closeQuickConceptCreator();else{closeRegisterMenu();closeAllActionModals();}}},{signal:pageAbort.signal});
   $('#expenseConcept').onchange=()=>{syncConcept('expense','#expenseConcept','#expenseCategory','#expenseForm');$$('#expenseChips button').forEach(x=>x.classList.remove('active'));};
   $('#incomeConcept').onchange=()=>{syncConcept('income','#incomeConcept','#incomeCategory','#incomeForm');$$('#incomeChips button').forEach(x=>x.classList.remove('active'));};
   $('#expenseAccount').onchange=()=>updateAccountHint('#expenseAccount','#expenseAccountHint');$('#incomeAccount').onchange=()=>renderIncomeAccountState(true);
@@ -344,12 +352,24 @@
 
   function shift(delta){const [y,m]=$('#period').value.split('-').map(Number),d=new Date(y,m-1+delta,1);$('#period').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;load();}
   $('#prevMonth').onclick=()=>shift(-1);$('#nextMonth').onclick=()=>shift(1);$('#period').onchange=load;
-  function realtime(){const es=new EventSource(api('stream.php'));es.addEventListener('change',()=>{clearTimeout(timer);timer=setTimeout(()=>load().catch(()=>{}),120)});}
-
-  bindMoneyFields();populateQuickForms();renderPayOptions();load().catch(console.error);loadConfig();realtime();
+  bindMoneyFields();populateQuickForms();renderPayOptions();load().catch(err=>{if(err?.name!=='AbortError')console.error(err)});loadConfig();
 
   // Permite abrir una acción desde cualquier módulo: /dashboard?action=transfer, etc.
   const q=new URLSearchParams(location.search),action=q.get('action');
   if(['expense','income','transfer','allocate'].includes(action)){setTimeout(()=>openActionModal(action),120);q.delete('action');const rest=q.toString();history.replaceState({},'',location.pathname+(rest?'?'+rest:''));}
   else if(action==='choose'){setTimeout(()=>toggleRegisterMenu(),120);q.delete('action');const rest=q.toString();history.replaceState({},'',location.pathname+(rest?'?'+rest:''));}
-})();
+
+  return {
+    refresh: async () => {
+      if(pageAbort.signal.aborted)return;
+      await Promise.all([load(),loadConfig()]);
+    },
+    destroy: () => {
+      pageAbort.abort();
+      clearTimeout(timer);
+      clearTimeout(toastTimer);
+      if(chart){try{chart.destroy()}catch{}chart=null;}
+      document.querySelectorAll('[data-money-value]').forEach(el=>{if(el._moneyAnimation)cancelAnimationFrame(el._moneyAnimation)});
+    }
+  };
+});

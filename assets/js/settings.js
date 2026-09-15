@@ -1,4 +1,5 @@
-(() => {
+window.MiDineroRegister('configuracion', () => {
+  const pageAbort = new AbortController();
   const root = document.querySelector('[data-settings-root]');
   if (!root) return;
 
@@ -39,7 +40,7 @@
     const path = location.pathname.replace(/\/+$/, '');
     const name = path.split('/').pop();
     activate(valid.includes(name) ? name : (root.dataset.activeTab || 'conceptos'), false);
-  });
+  }, {signal:pageAbort.signal});
 
 
 
@@ -94,7 +95,7 @@
 
   document.addEventListener('keydown', event => {
     if (event.key === 'Escape' && openModal) hideCreateModal(openModal);
-  });
+  }, {signal:pageAbort.signal});
 
   const serialize = form => {
     const data = new FormData(form);
@@ -149,13 +150,18 @@
         const response = await fetch(autosaveUrl, {
           method: 'POST',
           body,
-          headers: {
+          headers: window.MiDinero?.clientHeaders({
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache'
+          }) || {
             'X-Requested-With': 'XMLHttpRequest',
             'Accept': 'application/json',
             'Cache-Control': 'no-cache'
           },
           credentials: 'same-origin',
-          cache: 'no-store'
+          cache: 'no-store',
+          signal: pageAbort.signal
         });
 
         const raw = await response.text();
@@ -230,4 +236,9 @@
   const goalSavingsAccount=document.querySelector('#settingsGoalModal [data-goal-savings-account]');
   function syncGoalSavingsFields(){if(goalSavingsAccount&&goalType)goalSavingsAccount.hidden=goalType.value!=='savings';}
   goalType?.addEventListener('change',syncGoalSavingsFields);syncGoalSavingsFields();
-})();
+
+  return {
+    refresh: () => window.MiDinero.softRefresh({preserveScroll:true,noFallback:true}),
+    destroy: () => pageAbort.abort()
+  };
+});

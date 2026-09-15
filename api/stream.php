@@ -39,16 +39,25 @@ echo "retry: 1500\n\n";
 
 $start = time();
 while (!connection_aborted() && time() - $start < 20) {
-    $st = db()->prepare('SELECT id,event_type FROM realtime_events WHERE user_id=? AND id>? ORDER BY id ASC LIMIT 50');
+    $st = db()->prepare('SELECT id,event_type,payload_json FROM realtime_events WHERE user_id=? AND id>? ORDER BY id ASC LIMIT 50');
     $st->execute([$uid, $last]);
     $rows = $st->fetchAll();
 
     if ($rows) {
         $last = (int)$rows[count($rows)-1]['id'];
         $types = array_values(array_unique(array_column($rows, 'event_type')));
+        $events = [];
+        foreach ($rows as $row) {
+            $payload = json_decode((string)($row['payload_json'] ?? ''), true);
+            $events[] = [
+                'id' => (int)$row['id'],
+                'type' => (string)$row['event_type'],
+                'source_client_id' => is_array($payload) ? ($payload['source_client_id'] ?? null) : null,
+            ];
+        }
         echo "id: {$last}\n";
         echo "event: change\n";
-        echo 'data: ' . json_encode(['types'=>$types], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n\n";
+        echo 'data: ' . json_encode(['types'=>$types,'events'=>$events], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n\n";
     } else {
         echo ": ping\n\n";
     }

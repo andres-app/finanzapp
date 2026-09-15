@@ -1,4 +1,6 @@
-(()=>{
+window.MiDineroRegister('ahorro', () => {
+ const pageAbort=new AbortController(),delayed=new Set();
+ const delay=(fn,ms)=>{const id=window.setTimeout(()=>{delayed.delete(id);fn()},ms);delayed.add(id);return id};
  const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],api=f=>`${APP.apiBase}/${f}`,data=window.SAVINGS_DATA||{savings:{goals:[]},accounts:[],free:0};
  const money=n=>'S/ '+Number(n||0).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2});
  const parseMoneyInput=value=>{let v=String(value??'').trim().replace(/\s/g,'').replace(/S\/?/gi,'').replace(/[^0-9,.-]/g,'');if(!v)return 0;const neg=v.startsWith('-');v=v.replace(/-/g,'');const d=v.lastIndexOf('.'),c=v.lastIndexOf(',');if(d>=0&&c>=0){const x=Math.max(d,c);v=v.slice(0,x).replace(/[.,]/g,'')+'.'+v.slice(x+1).replace(/[.,]/g,'')}else if(c>=0){const p=v.split(','),r=p.at(-1).length;v=p.length>2?(r<=2?p.slice(0,-1).join('')+'.'+p.at(-1):p.join('')):(r<=2?v.replace(',','.'):v.replace(/,/g,''))}else if(d>=0){const p=v.split('.'),r=p.at(-1).length;if(p.length>2)v=r<=2?p.slice(0,-1).join('')+'.'+p.at(-1):p.join('')}const n=Number(v);return Number.isFinite(n)?(neg?-n:n):0};
@@ -10,7 +12,7 @@
  const bindMoneyFields=()=>$$('[data-money-input]').forEach(el=>{if(el.dataset.moneyBound)return;el.dataset.moneyBound='1';el.addEventListener('focus',()=>moneyFieldEdit(el));el.addEventListener('input',()=>sanitizeMoneyTyping(el));el.addEventListener('paste',e=>{const text=e.clipboardData?.getData('text');if(text==null)return;e.preventDefault();const n=parseMoneyInput(text);el.value=Number.isFinite(n)?n.toFixed(2):'';requestAnimationFrame(()=>{try{el.setSelectionRange(el.value.length,el.value.length)}catch{}})});el.addEventListener('blur',()=>{if(el.value.trim())moneyFieldSet(el,parseMoneyInput(el.value))})});
  const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
  const nowLocal=()=>new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16);
- async function post(file,payload){const r=await fetch(api(file),{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':APP.csrf},body:JSON.stringify(payload)}),raw=await r.text();let j={};try{j=JSON.parse(raw)}catch{}if(!r.ok||j.ok===false)throw new Error(j.message||`Error HTTP ${r.status}`);return j}
+ async function post(file,payload){const headers=window.MiDinero?.clientHeaders({'Content-Type':'application/json','X-CSRF-Token':APP.csrf})||{'Content-Type':'application/json','X-CSRF-Token':APP.csrf};const r=await fetch(api(file),{method:'POST',headers,body:JSON.stringify(payload),signal:pageAbort.signal}),raw=await r.text();let j={};try{j=JSON.parse(raw)}catch{}if(!r.ok||j.ok===false)throw new Error(j.message||`Error HTTP ${r.status}`);return j}
  const dep=$('#savingsDepositModal'),withM=$('#savingsWithdrawModal'),edit=$('#savingsEditModal');
  function show(m){m?.classList.add('show');m?.setAttribute('aria-hidden','false');document.body.classList.add('modal-open')}
  function hide(m){m?.classList.remove('show');m?.setAttribute('aria-hidden','true');if(!$$('.modal.show').length)document.body.classList.remove('modal-open')}
@@ -20,8 +22,8 @@
    const pieces=Array.from({length:14},(_,i)=>`<i style="--i:${i}"></i>`).join('');
    box.innerHTML=`<div class="savings-confetti">${pieces}</div><div class="savings-celebration-card"><span class="savings-celebration-icon">🎉</span><div><small>¡BIEN HECHO!</small><h3>¡Felicidades! Ahorraste ${money(amount)}</h3><p>${esc(goalName)} · ahora tienes <b>${money(total)}</b> protegidos.</p></div><span class="savings-celebration-check">✓</span></div>`;
    document.body.appendChild(box);requestAnimationFrame(()=>box.classList.add('show'));
-   setTimeout(()=>box.classList.add('leaving'),1550);
-   setTimeout(()=>box.remove(),1950);
+   delay(()=>box.classList.add('leaving'),1550);
+   delay(()=>box.remove(),1950);
  }
  function goal(id){return (data.savings?.goals||[]).find(g=>String(g.id)===String(id))}
  function account(id){return (data.accounts||[]).find(a=>String(a.id)===String(id))}
@@ -51,7 +53,7 @@
    $('#savingsDepositForm [name="amount"]').value='';
    updateDepositPreview();
  }
- function openDeposit(goalId='',fromId=''){fillDeposit(goalId,fromId);show(dep);setTimeout(()=>$('#savingsDepositForm [name="amount"]')?.focus(),80)}
+ function openDeposit(goalId='',fromId=''){fillDeposit(goalId,fromId);show(dep);delay(()=>$('#savingsDepositForm [name="amount"]')?.focus(),80)}
  $('#openSavingsDeposit')?.addEventListener('click',()=>openDeposit());
  $('#openSavingsDepositInline')?.addEventListener('click',()=>openDeposit());
  $$('[data-save-to-goal]').forEach(b=>b.addEventListener('click',()=>openDeposit(b.dataset.saveToGoal)));
@@ -76,7 +78,7 @@
      const goalName=selectedGoalName();
      hide(dep);
      celebrateSavings(Number(result.amount||d.amount||0),goalName,Number(result.protected_total||0));
-     setTimeout(()=>location.reload(),1850);
+     delay(()=>window.MiDinero.softRefresh({preserveScroll:true}),1850);
    }catch(err){appNotice(err.message,'error')}finally{b.disabled=false;b.textContent='🔒 Guardar en Ahorro'}
  });
 
@@ -86,7 +88,7 @@
    const g=Number(goalId)===0?generalGoal():goal(goalId),held=withdrawalAccountRows(g);if(!g||!held.length)return;
    $('#withdrawGoal').value=String(goalId);$('#withdrawFrom').innerHTML=opts('',held);$('#withdrawTo').innerHTML=opts(held[0]?.id||'',data.accounts||[]);if(held.length)$('#withdrawFrom').selectedIndex=0;
    if(held[0]?.id&&[...$('#withdrawTo').options].some(o=>o.value===String(held[0].id)))$('#withdrawTo').value=String(held[0].id);
-   $('#savingsWithdrawForm [name="occurred_at"]').value=nowLocal();$('#savingsWithdrawForm [name="amount"]').value='';clearModalFeedback(withM);show(withM);setTimeout(()=>$('#savingsWithdrawForm [name="amount"]')?.focus(),80)
+   $('#savingsWithdrawForm [name="occurred_at"]').value=nowLocal();$('#savingsWithdrawForm [name="amount"]').value='';clearModalFeedback(withM);show(withM);delay(()=>$('#savingsWithdrawForm [name="amount"]')?.focus(),80)
  }
  $$('[data-withdraw-goal]').forEach(b=>b.addEventListener('click',()=>openWithdraw(b.dataset.withdrawGoal)));
  $$('[data-withdraw-general]').forEach(b=>b.addEventListener('click',()=>openWithdraw(0)));
@@ -101,7 +103,7 @@
    try{
      const result=await post('savings_withdraw.php',d);
      hide(withM);appNotice(result.message||`Liberaste ${money(d.amount)} del Ahorro`,'ok');
-     setTimeout(()=>location.reload(),750);
+     delay(()=>window.MiDinero.softRefresh({preserveScroll:true}),750);
    }catch(err){
      modalFeedback(withM,err.message,'error');appNotice(err.message,'error');
    }finally{if(b){b.disabled=false;b.textContent='🔓 Retirar del Ahorro'}}
@@ -109,13 +111,15 @@
 
  $$('[data-edit-goal]').forEach(b=>b.addEventListener('click',()=>{$('#editSavingGoal').value=b.dataset.editGoal;moneyFieldSet($('#editSavingTarget'),b.dataset.target);$('#editSavingPeriod').value=b.dataset.period;show(edit)}));
  $$('[data-savings-edit-close]').forEach(b=>b.onclick=()=>hide(edit));edit?.addEventListener('click',e=>{if(e.target===edit)hide(edit)});
- $('#savingsEditForm')?.addEventListener('submit',async e=>{e.preventDefault();const b=e.submitter,d=Object.fromEntries(new FormData(e.target).entries());d.target_amount=moneyFieldRaw($('#editSavingTarget'));b.disabled=true;b.textContent='Guardando...';try{await post('savings_goal_save.php',d);location.reload()}catch(err){appNotice(err.message,'error')}finally{b.disabled=false;b.textContent='Guardar meta'}});
+ $('#savingsEditForm')?.addEventListener('submit',async e=>{e.preventDefault();const b=e.submitter,d=Object.fromEntries(new FormData(e.target).entries());d.target_amount=moneyFieldRaw($('#editSavingTarget'));b.disabled=true;b.textContent='Guardando...';try{await post('savings_goal_save.php',d);await window.MiDinero.softRefresh({preserveScroll:true})}catch(err){appNotice(err.message,'error')}finally{b.disabled=false;b.textContent='Guardar meta'}});
 
  bindMoneyFields();
  const q=new URLSearchParams(location.search);if(q.get('action')==='deposit'){
    const goalFromUrl=q.get('goal')||'',fromFromUrl=q.get('from')||'';
    const cleanUrl=new URL(location.href);cleanUrl.searchParams.delete('action');cleanUrl.searchParams.delete('goal');cleanUrl.searchParams.delete('from');
    history.replaceState({},document.title,cleanUrl.pathname+(cleanUrl.search||'')+(cleanUrl.hash||''));
-   setTimeout(()=>openDeposit(goalFromUrl,fromFromUrl),100)
+   delay(()=>openDeposit(goalFromUrl,fromFromUrl),100)
  }
-})();
+
+ return {refresh:()=>window.MiDinero.softRefresh({preserveScroll:true,noFallback:true}),destroy:()=>{pageAbort.abort();delayed.forEach(id=>clearTimeout(id));delayed.clear();}};
+});

@@ -118,8 +118,15 @@ function month_range(string $period): array {
     return [$start->format('Y-m-d H:i:s'), $end->format('Y-m-d H:i:s')];
 }
 function emit_event(int $userId, string $type, array $payload = []): void {
+    // Identifica la pestaña que originó el cambio. Así el realtime actualiza
+    // otros dispositivos/pestañas sin recargar el formulario que acaba de guardar.
+    $sourceClient = trim((string)($_SERVER['HTTP_X_CLIENT_ID'] ?? ''));
+    if ($sourceClient !== '') {
+        $sourceClient = preg_replace('/[^A-Za-z0-9._:-]/', '', $sourceClient) ?: '';
+        if ($sourceClient !== '') $payload['source_client_id'] = substr($sourceClient, 0, 80);
+    }
     $st = db()->prepare('INSERT INTO realtime_events(user_id,event_type,payload_json,created_at) VALUES(?,?,?,NOW())');
-    $st->execute([$userId,$type,json_encode($payload, JSON_UNESCAPED_UNICODE)]);
+    $st->execute([$userId,$type,json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)]);
 }
 function current_user(): ?array {
     static $cachedUserId = null;
