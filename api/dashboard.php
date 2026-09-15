@@ -174,9 +174,11 @@ try {
             WHERE mp.user_id=? AND mp.period=? AND mp.status='pending' ORDER BY mp.due_date ASC");
         $selectedPendingQ->execute([$uid,$period]);$pending=$selectedPendingQ->fetchAll();
 
-        $recent=db()->prepare("SELECT t.id,t.type,t.amount,t.occurred_at,t.description,t.is_ant_expense,c.name category,c.icon,co.name concept,a.name account,f.name fund
+        $recent=db()->prepare("SELECT t.id,t.type,t.amount,t.occurred_at,t.description,t.is_ant_expense,c.name category,c.icon,co.name concept,a.name account,f.name fund,
+            u.name actor_name
             FROM transactions t JOIN categories c ON c.id=t.category_id LEFT JOIN concepts co ON co.id=t.concept_id
             LEFT JOIN financial_accounts a ON a.id=t.account_id LEFT JOIN funds f ON f.id=t.fund_id
+            LEFT JOIN users u ON u.id=COALESCE(t.created_by_user_id,t.user_id)
             WHERE t.user_id=? ORDER BY t.id DESC LIMIT 10");
         $recent->execute([$uid]);
 
@@ -205,6 +207,7 @@ try {
         $uncoveredPending=max(0,$pendingTotal-$fundedCoverage);
         // Los pagos pendientes no descuentan el saldo: solo un pago/gasto registrado lo hace.
         $free=$unallocated;
+        $afterCommitments=$totalCash-$pendingTotal;
         $nextPeriod=$startDt->modify('+1 month')->format('Y-m');
 
         // El cálculo compatible también debe conservar el módulo de Ahorro.
@@ -236,7 +239,7 @@ try {
                 'income'=>$income,'expense'=>$expense,'balance'=>$monthNet,'adjustment'=>0,'ant'=>(float)$cur['ant'],
                 'opening_balance'=>$opening,'closing_balance'=>$opening+$monthNet,'total_cash'=>$totalCash,'available_in_accounts'=>$totalCash,
                 'reserved'=>$reserved,'operational_reserved'=>$operationalReserved,'savings_reserved'=>$savingsReserved,
-                'unallocated'=>$unallocated,'pending_total'=>$pendingTotal,'funded_pending'=>$fundedCoverage,
+                'unallocated'=>$unallocated,'pending_total'=>$pendingTotal,'after_commitments'=>$afterCommitments,'funded_pending'=>$fundedCoverage,
                 'uncovered_pending'=>$uncoveredPending,'free_to_spend'=>$free,'income_change'=>$pct($income,$pi),
                 'expense_change'=>$pct($expense,$pe),'balance_prev'=>$pi-$pe,
                 'savings_rate'=>$income>0?($monthNet/$income)*100:0,'ant_projected'=>(float)$cur['ant'],

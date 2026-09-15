@@ -438,9 +438,11 @@ class FinanceService {
         $nextPeriod = $startDt->modify('+1 month')->format('Y-m');
         $goals->execute([$userId,$nextPeriod]); $gNext = $goals->fetchAll();
 
-        $recent = db()->prepare("SELECT t.id,t.type,t.amount,t.occurred_at,t.description,t.is_ant_expense,c.name category,c.icon,co.name concept,a.name account,f.name fund
+        $recent = db()->prepare("SELECT t.id,t.type,t.amount,t.occurred_at,t.description,t.is_ant_expense,c.name category,c.icon,co.name concept,a.name account,f.name fund,
+            u.name actor_name
             FROM transactions t JOIN categories c ON c.id=t.category_id LEFT JOIN concepts co ON co.id=t.concept_id
             LEFT JOIN financial_accounts a ON a.id=t.account_id LEFT JOIN funds f ON f.id=t.fund_id
+            LEFT JOIN users u ON u.id=COALESCE(t.created_by_user_id,t.user_id)
             WHERE t.user_id=? ORDER BY t.id DESC LIMIT 10");
         $recent->execute([$userId]);
 
@@ -496,6 +498,9 @@ class FinanceService {
         // Los pendientes se muestran como referencia, pero no descuentan dinero real.
         // El saldo cambia recién cuando el usuario registra efectivamente el pago/gasto.
         $freeToSpend=$unallocated;
+        // Proyección informativa: no altera el saldo real. Indica cuánto quedaría
+        // en las cuentas si hoy se pagaran todos los compromisos pendientes.
+        $afterCommitments=$totalCash-$pendingTotal;
 
         $savings=self::savingsOverview($userId);
         $savingByGoal=[];foreach($savings['goals'] as $sg)$savingByGoal[(int)$sg['id']]=(float)$sg['saved_amount'];
@@ -519,7 +524,7 @@ class FinanceService {
                 'income'=>$income,'expense'=>$expense,'balance'=>$monthNet,'adjustment'=>$monthAdjustment,'ant'=>(float)$cur['ant'],
                 'opening_balance'=>$opening,'closing_balance'=>$closing,'total_cash'=>$totalCash,'available_in_accounts'=>$totalCash,
                 'reserved'=>$reserved,'operational_reserved'=>$operationalReserved,'savings_reserved'=>$savingsReserved,
-                'unallocated'=>$unallocated,'pending_total'=>$pendingTotal,
+                'unallocated'=>$unallocated,'pending_total'=>$pendingTotal,'after_commitments'=>$afterCommitments,
                 'funded_pending'=>$fundedCoverage,'uncovered_pending'=>$uncoveredPending,'free_to_spend'=>$freeToSpend,
                 'income_change'=>$pct($income,$pi),'expense_change'=>$pct($expense,$pe),'balance_prev'=>$pi-$pe,
                 'savings_rate'=>$income>0 ? ($monthNet/$income)*100 : 0,'ant_projected'=>$antProjected,

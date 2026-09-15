@@ -149,6 +149,9 @@ window.MiDineroRegister('dashboard', () => {
     setText('#periodLabel',periodLabel(d.period));
     const availableInAccounts=Number(s.available_in_accounts??s.total_cash??0);
     setText('#reservedTotal',money(s.operational_reserved??s.reserved));setText('#pendingHero',money(s.pending_total));animateMoney('#freeToSpend',availableInAccounts);
+    const afterCommitments=Number(s.after_commitments??(availableInAccounts-Number(s.pending_total||0)));
+    setText('#afterCommitments',money(afterCommitments));
+    const projection=$('#cashProjection');if(projection)projection.classList.toggle('negative',afterCommitments<0);
     const free=$('#freeToSpend');if(free)free.classList.toggle('negative',availableInAccounts<0);
     setText('#cashExplanation',Number(s.pending_total||0)>0
       ? 'Los pagos pendientes todavía no reducen este saldo. Se descontarán cuando los registres como pagados.'
@@ -159,7 +162,7 @@ window.MiDineroRegister('dashboard', () => {
     setText('#incomeChange',`${s.income_change>=0?'+':''}${Number(s.income_change).toFixed(1)}% vs. mes anterior`);
     setText('#expenseChange',`${s.expense_change>=0?'+':''}${Number(s.expense_change).toFixed(1)}% vs. mes anterior`);
     setText('#quickUnallocated',money(s.unallocated));
-    renderSavings(d.savings||{});renderFunds((d.funds||[]).filter(f=>!f.savings_goal_id));renderPending(d.pending_current||d.pending);renderAnt(d.ant_expenses,s.ant,s.ant_projected);
+    renderSavings(d.savings||{});renderFunds((d.funds||[]).filter(f=>!f.savings_goal_id));renderPending(d.pending_current||d.pending);renderAnt(d.ant_expenses,s.ant,s.ant_projected);renderRecent(d.recent||[]);
     try{renderChart(d.daily);}catch(err){console.error('No se pudo renderizar el gráfico:',err);}
   }
 
@@ -220,7 +223,15 @@ window.MiDineroRegister('dashboard', () => {
     $$('[data-pay]').forEach(b=>b.onclick=()=>openPay(b.dataset));
   }
   function renderAnt(rows,total,projected){setText('#antTotal',money(total));setText('#antProjection',projected>total?`Proyección ${money(projected)} al cierre`:'Pequeños gastos del mes');const box=$('#antList');if(!box)return;box.innerHTML=rows.length?rows.map(r=>`<div class="task-row"><span class="task-icon">${esc(r.icon||'•')}</span><div class="task-name"><b>${esc(r.name)}</b><small>${r.qty} movimiento${+r.qty!==1?'s':''}</small></div><strong>${money(r.total)}</strong></div>`).join(''):'<div class="empty compact">Sin gastos hormiga este mes.</div>';}
-  function renderRecent(rows){$('#recentList').innerHTML=rows.length?rows.slice(0,4).map(r=>`<div class="activity-row"><span class="activity-avatar">${esc(r.icon||'•')}</span><div><div class="activity-meta"><b>${esc(r.concept||r.category)}</b><time>${r.occurred_at.slice(11,16)}</time></div><p>${esc(r.account||'Cuenta')} ${r.fund?'· '+esc(r.fund):''}</p><div class="activity-bubble ${r.type}">${r.type==='income'?'+':'-'} ${money(r.amount)}</div></div></div>`).join(''):'<div class="empty compact">Sin actividad.</div>';}
+  function renderRecent(rows){
+    const box=$('#recentList');if(!box)return;
+    box.innerHTML=rows.length?rows.slice(0,6).map(r=>{
+      const actor=esc(r.actor_name||'Usuario');
+      const when=r.occurred_at?String(r.occurred_at).replace(' ','T'):'';
+      let time='';try{time=when?new Intl.DateTimeFormat('es-PE',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(when)):'';}catch(_){time=String(r.occurred_at||'').slice(0,16);}
+      return `<div class="minimal-activity-row"><span class="minimal-activity-icon">${esc(r.icon||'•')}</span><div class="minimal-activity-copy"><div><b>${esc(r.concept||r.category||'Movimiento')}</b><time>${esc(time)}</time></div><p>${actor} · ${esc(r.account||'Cuenta')}${r.fund?' · '+esc(r.fund):''}</p></div><strong class="minimal-activity-amount ${r.type}">${r.type==='income'?'+':'−'} ${money(r.amount)}</strong></div>`;
+    }).join(''):'<div class="empty compact">Todavía no hay movimientos registrados.</div>';
+  }
   function renderCategories(rows){const total=rows.reduce((a,r)=>a+Number(r.total),0)||1;$('#categoryBars').innerHTML=rows.length?rows.slice(0,4).map(r=>{const p=Math.round(+r.total/total*100);return `<div class="category-row"><span class="category-icon">${esc(r.icon||'•')}</span><div><div><b>${esc(r.name)}</b><strong>${money(r.total)}</strong></div><div class="thin-progress"><i style="width:${p}%;background:${safeColor(r.color)}"></i></div><small>${p}% del gasto</small></div></div>`}).join(''):'<div class="empty compact">Aún no hay egresos.</div>';}
 
   // ===== Acciones rápidas independientes =====

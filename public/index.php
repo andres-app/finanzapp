@@ -58,6 +58,7 @@ page_top('Dashboard','dashboard');
       <span>SALDO DISPONIBLE EN CUENTAS</span>
       <strong id="freeToSpend">S/ 0.00</strong>
       <p id="cashExplanation">Los pagos pendientes no se descuentan hasta que realmente los registres como pagados.</p>
+      <div class="cash-projection" id="cashProjection"><span>Si pagas todo lo pendiente</span><strong id="afterCommitments">S/ 0.00</strong></div>
     </div>
     <div class="minimal-money-stats">
       <div><span>Por pagar</span><strong id="pendingHero">S/ 0.00</strong></div>
@@ -97,6 +98,14 @@ page_top('Dashboard','dashboard');
       <div class="minimal-savings-foot"><span id="dashboardSavingsPct">0% de la meta</span><span id="dashboardSavingsAccount">Sin cuenta definida</span></div>
       <span id="heroSavingsMirror" class="sr-only"></span>
     </article>
+  </section>
+
+  <section class="minimal-panel minimal-activity-panel">
+    <div class="minimal-panel-head">
+      <div><span>ACTIVIDAD DEL HOGAR</span><h2>Últimos movimientos</h2><p>Podrás ver quién registró cada ingreso o gasto.</p></div>
+      <a class="minimal-link" href="<?=e(app_url('movimientos'))?>">Ver historial</a>
+    </div>
+    <div id="recentList" class="minimal-activity-list"></div>
   </section>
 
   <section class="minimal-quick-links">
