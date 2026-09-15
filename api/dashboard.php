@@ -171,6 +171,13 @@ try {
             GROUP BY name,c.icon ORDER BY total DESC LIMIT 6");
         $ant->execute([$uid,$start,$end]);
 
+        $topExpenses=db()->prepare("SELECT t.id,t.amount,t.occurred_at,t.description,c.name category,c.icon,c.color,co.name concept,a.name account,u.name actor_name
+            FROM transactions t JOIN categories c ON c.id=t.category_id LEFT JOIN concepts co ON co.id=t.concept_id
+            LEFT JOIN financial_accounts a ON a.id=t.account_id LEFT JOIN users u ON u.id=COALESCE(t.created_by_user_id,t.user_id)
+            WHERE t.user_id=? AND t.voided_at IS NULL AND t.type='expense' AND t.occurred_at>=? AND t.occurred_at<?
+            ORDER BY t.amount DESC,t.occurred_at DESC LIMIT 5");
+        $topExpenses->execute([$uid,$start,$end]);
+
         $currentPeriod=date('Y-m');
         $pendingQ=db()->prepare("SELECT mp.id,mp.period,mp.due_date,mp.amount,mp.paid_amount,
                 GREATEST(mp.amount-mp.paid_amount,0) remaining_amount,mp.status,
@@ -273,7 +280,7 @@ try {
             'accounts'=>$accounts,'funds'=>$funds,'categories'=>$cat->fetchAll(),'daily'=>$daily->fetchAll(),
             'ant_expenses'=>$ant->fetchAll(),'pending'=>$pending,'pending_current'=>$pendingCurrent,'payments_current'=>$paymentsCurrent,
             'goals_current'=>[],'goals_next'=>[],'fixed_incomes'=>[],'recent'=>$recent->fetchAll(),
-            'savings'=>$savingsSafe,'degraded_mode'=>true
+            'top_expenses'=>$topExpenses->fetchAll(),'savings'=>$savingsSafe,'degraded_mode'=>true
         ];
         json_response(['ok'=>true,'data'=>$data,'warning'=>'Se usó el cálculo compatible del dashboard.']);
     } catch (Throwable $fallbackError) {

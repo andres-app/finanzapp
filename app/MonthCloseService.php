@@ -114,10 +114,10 @@ class MonthCloseService {
     }
 
     private static function paymentsForPeriod(int $userId,string $period): array {
-        $rows=[];$pending=0.0;
+        $rows=[];$committed=0.0;$paid=0.0;$pending=0.0;
         if(self::tableExists('monthly_payments') && self::tableExists('recurring_payments')){
             $hasPaid=self::columnExists('monthly_payments','paid_amount');
-            $paidExpr=$hasPaid?'mp.paid_amount':"CASE WHEN mp.status='paid' THEN mp.amount ELSE 0 END";
+            $paidExpr=$hasPaid?'COALESCE(mp.paid_amount,0)':"CASE WHEN mp.status='paid' THEN mp.amount ELSE 0 END";
             $st=db()->prepare("SELECT mp.id,mp.amount,{$paidExpr} paid_amount,
                     GREATEST(mp.amount-({$paidExpr}),0) remaining_amount,mp.status,mp.due_date,r.name
                 FROM monthly_payments mp JOIN recurring_payments r ON r.id=mp.recurring_id
@@ -126,10 +126,13 @@ class MonthCloseService {
             foreach($st->fetchAll() as $p){
                 $status=(string)($p['status']??'pending');
                 $remaining=round((float)($p['remaining_amount']??0),2);
+                $amount=round((float)($p['amount']??0),2);
+                $paidAmount=round((float)($p['paid_amount']??0),2);
+                if($status!=='skipped'){$committed+=$amount;$paid+=$paidAmount;}
                 if(in_array($status,['pending','partial'],true))$pending+=$remaining;
                 $rows[]=[
                     'id'=>(int)($p['id']??0),'name'=>(string)($p['name']??'Pago fijo'),
-                    'amount'=>round((float)($p['amount']??0),2),'paid_amount'=>round((float)($p['paid_amount']??0),2),
+                    'amount'=>$amount,'paid_amount'=>$paidAmount,
                     'remaining_amount'=>$remaining,'status'=>$status,'due_date'=>(string)($p['due_date']??($period.'-01'))
                 ];
             }
@@ -148,10 +151,15 @@ class MonthCloseService {
                 $day=max(1,min((int)($r['due_day']??1),$days));$amount=round((float)($r['amount']??0),2);
                 $rows[]=['id'=>0,'name'=>(string)($r['name']??'Pago fijo'),'amount'=>$amount,'paid_amount'=>0.0,
                     'remaining_amount'=>$amount,'status'=>'pending','due_date'=>sprintf('%04d-%02d-%02d',$y,$m,$day)];
-                $pending+=$amount;
+                $committed+=$amount;$pending+=$amount;
             }
         }
-        return ['rows'=>$rows,'pending'=>round($pending,2)];
+        return [
+            'rows'=>$rows,
+            'committed'=>round($committed,2),
+            'paid'=>round($paid,2),
+            'pending'=>round($pending,2)
+        ];
     }
 
     public static function snapshot(int $userId,string $period): array {
@@ -186,6 +194,8 @@ class MonthCloseService {
                 'opening_balance'=>round($openingTotal,2),
                 'closing_balance'=>round($closingTotal,2),
                 'available_in_accounts'=>round($closingTotal,2),
+                'committed_total'=>$payments['committed'],
+                'paid_total'=>$payments['paid'],
                 'pending_total'=>$payments['pending'],
                 'after_commitments'=>round($closingTotal-$payments['pending'],2),
                 'savings_reserved'=>$funds['savings'],

@@ -35,6 +35,8 @@ function page_top(string $title, string $active = 'dashboard'): void {
             <b>mi dinero</b>
         </a>
 
+        <button class="global-search-trigger" id="globalSearchTrigger" data-global-search-trigger type="button" aria-label="Buscar en Mi Dinero"><span class="global-search-trigger-icon">⌕</span><span>Buscar</span><kbd>Ctrl K</kbd></button>
+
         <nav class="side-nav">
             <a class="<?=$active==='dashboard'?'active':''?>" href="<?=e(app_url('dashboard'))?>"><?=nav_svg('dashboard')?><span>Dashboard</span></a>
             <a class="<?=$active==='movimientos'?'active':''?>" href="<?=e(app_url('movimientos'))?>"><?=nav_svg('movimientos')?><span>Movimientos</span></a>
@@ -60,6 +62,7 @@ function page_top(string $title, string $active = 'dashboard'): void {
         <header class="mobile-topbar">
             <button class="menu-btn" type="button" aria-label="Abrir menú" onclick="document.body.classList.toggle('menu-open')">☰</button>
             <a class="mobile-brand" href="<?=e(app_url('dashboard'))?>">mi dinero</a>
+            <button class="mobile-search-trigger" type="button" data-global-search-trigger aria-label="Buscar">⌕</button>
             <a class="mobile-quick-add" href="<?=e(app_url('dashboard?action=choose'))?>" aria-label="Registrar">＋</a>
             <span class="live-dot"><i></i> vivo</span>
         </header>
@@ -67,6 +70,15 @@ function page_top(string $title, string $active = 'dashboard'): void {
     echo '<script>window.APP={csrf:' . json_encode(csrf_token()) . ',apiBase:' . json_encode($apiBase) . ',routes:{dashboard:' . json_encode(app_url('dashboard')) . ',movimientos:' . json_encode(app_url('movimientos')) . ',actividad:' . json_encode(app_url('actividad')) . ',cierre:' . json_encode(app_url('cierre')) . ',cuentas:' . json_encode(app_url('cuentas')) . ',fondos:' . json_encode(app_url('fondos')) . ',ahorro:' . json_encode(app_url('ahorro')) . ',presupuesto:' . json_encode(app_url('ahorro')) . ',configuracion:' . json_encode(app_url('configuracion')) . '}};</script>';
     echo '<script src="' . e(app_url('assets/js/app-shell.js')) . '?v=' . e((string)@filemtime(__DIR__.'/../assets/js/app-shell.js')) . '"></script>';
 ?>
+        <div class="global-search-modal" id="globalSearchModal" aria-hidden="true">
+            <button class="global-search-backdrop" type="button" data-global-search-close aria-label="Cerrar búsqueda"></button>
+            <div class="global-search-card" role="dialog" aria-modal="true" aria-label="Buscador global">
+                <div class="global-search-box"><span>⌕</span><input id="globalSearchInput" type="search" placeholder="Busca WIN, alquiler, 300, Lissette…" autocomplete="off"><button type="button" data-global-search-close>ESC</button></div>
+                <div class="global-search-hint"><span>Busca movimientos, pagos, cuentas, fondos y actividad.</span><kbd>Ctrl K</kbd></div>
+                <div class="global-search-results" id="globalSearchResults"><div class="global-search-empty"><b>Busca cualquier cosa de tus finanzas</b><span>Prueba: WIN, alquiler, 300, Lissette…</span></div></div>
+            </div>
+        </div>
+<?php echo '<script src="' . e(app_url('assets/js/global-search.js')) . '?v=' . e((string)@filemtime(__DIR__.'/../assets/js/global-search.js')) . '"></script>'; ?>
         <section class="content" data-page="<?=e($active)?>">
 <?php
 }

@@ -498,6 +498,13 @@ class FinanceService {
             WHERE t.user_id=? AND t.voided_at IS NULL ORDER BY t.id DESC LIMIT 10");
         $recent->execute([$userId]);
 
+        $topExpenses = db()->prepare("SELECT t.id,t.amount,t.occurred_at,t.description,c.name category,c.icon,c.color,co.name concept,a.name account,u.name actor_name
+            FROM transactions t JOIN categories c ON c.id=t.category_id LEFT JOIN concepts co ON co.id=t.concept_id
+            LEFT JOIN financial_accounts a ON a.id=t.account_id LEFT JOIN users u ON u.id=COALESCE(t.created_by_user_id,t.user_id)
+            WHERE t.user_id=? AND t.voided_at IS NULL AND t.type='expense' AND t.occurred_at>=? AND t.occurred_at<?
+            ORDER BY t.amount DESC,t.occurred_at DESC LIMIT 5");
+        $topExpenses->execute([$userId,$start,$end]);
+
         // Ingresos fijos son expectativas, no dinero real hasta que exista una
         // transacción. Derivamos cuánto se esperaba, cuánto llegó y cuánto falta.
         $fixedIncomeRows=[];
@@ -585,7 +592,7 @@ class FinanceService {
             'accounts'=>$accounts,'funds'=>$funds,'categories'=>$cat->fetchAll(),'daily'=>$daily->fetchAll(),'ant_expenses'=>$ant->fetchAll(),
             'pending'=>$pendingRows,'pending_current'=>$pendingFinancialRows,'payments_current'=>$paymentsCurrent,'current_period'=>$currentPeriod,
             'goals_current'=>$gCur,'goals_next'=>$gNext,'fixed_incomes'=>$fixedIncomeRows,'recent'=>$recent->fetchAll(),
-            'savings'=>$savings
+            'top_expenses'=>$topExpenses->fetchAll(),'savings'=>$savings
         ];
     }
 }

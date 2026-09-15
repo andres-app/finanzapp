@@ -24,6 +24,34 @@ function close_money($v): string{return 'S/ '.number_format((float)$v,2);}
 function close_status_label(string $status): string{
     switch($status){case 'paid': return 'Pagado';case 'partial': return 'Parcial';case 'skipped': return 'Omitido';default: return 'Pendiente';}
 }
+function close_period_label(string $period): string{
+    $months=[1=>'Enero',2=>'Febrero',3=>'Marzo',4=>'Abril',5=>'Mayo',6=>'Junio',7=>'Julio',8=>'Agosto',9=>'Septiembre',10=>'Octubre',11=>'Noviembre',12=>'Diciembre'];
+    if(!preg_match('/^(\d{4})-(\d{2})$/',$period,$m))return $period;
+    $month=(int)$m[2];
+    return ($months[$month]??$period).' '.$m[1];
+}
+function close_commitment_totals(array $snapshot): array{
+    $summary=$snapshot['summary']??[];
+    if(array_key_exists('committed_total',$summary) && array_key_exists('paid_total',$summary)){
+        return [
+            'committed'=>(float)($summary['committed_total']??0),
+            'paid'=>(float)($summary['paid_total']??0),
+            'pending'=>(float)($summary['pending_total']??0),
+        ];
+    }
+    $committed=0.0;$paid=0.0;$pending=0.0;
+    foreach(($snapshot['payments']??[]) as $payment){
+        $status=(string)($payment['status']??'pending');
+        if($status==='skipped')continue;
+        $committed+=(float)($payment['amount']??0);
+        $paid+=(float)($payment['paid_amount']??0);
+        $pending+=(float)($payment['remaining_amount']??0);
+    }
+    return ['committed'=>$committed,'paid'=>$paid,'pending'=>$pending];
+}
+$periodLabel=close_period_label($period);
+$currentCommitments=close_commitment_totals($current);
+$savedCommitments=$saved?close_commitment_totals($saved):['committed'=>0.0,'paid'=>0.0,'pending'=>0.0];
 page_top('Cierre mensual','cierre');
 ?>
 <div class="page-wrap close-page">
@@ -40,9 +68,9 @@ page_top('Cierre mensual','cierre');
 
  <section class="close-status-card <?=$closed?'is-closed':($closure?'is-reopened':'is-open')?>">
   <div>
-   <?php if($closed):?><span class="close-status-kicker">▣ CERRADO</span><h2><?=e($period)?></h2><p>Cerrado por <?=e($closure['closed_by_name']?:'Usuario')?> el <?=e(date('d/m/Y H:i',strtotime($closure['closed_at'])))?>.</p>
-   <?php elseif($closure):?><span class="close-status-kicker">↺ REABIERTO</span><h2><?=e($period)?></h2><p>La fotografía anterior se conserva; puedes volver a cerrar el mes cuando termines tus correcciones.</p>
-   <?php else:?><span class="close-status-kicker">● ABIERTO</span><h2><?=e($period)?></h2><p>Cuando cierres el mes se guardarán sus principales cifras y compromisos como referencia histórica.</p><?php endif;?>
+   <?php if($closed):?><span class="close-status-kicker">▣ CERRADO</span><h2><?=e($periodLabel)?></h2><p>Cerrado por <?=e($closure['closed_by_name']?:'Usuario')?> el <?=e(date('d/m/Y H:i',strtotime($closure['closed_at'])))?>.</p>
+   <?php elseif($closure):?><span class="close-status-kicker">↺ REABIERTO</span><h2><?=e($periodLabel)?></h2><p>La fotografía anterior se conserva; puedes volver a cerrar el mes cuando termines tus correcciones.</p>
+   <?php else:?><span class="close-status-kicker">● ABIERTO</span><h2><?=e($periodLabel)?></h2><p>Cuando cierres el mes se guardarán sus principales cifras y compromisos como referencia histórica.</p><?php endif;?>
   </div>
   <div class="close-status-actions">
    <a class="btn" href="<?=e(app_url('actividad?period='.$period))?>">Ver actividad</a>
@@ -64,18 +92,47 @@ page_top('Cierre mensual','cierre');
  <div class="close-compare-grid">
   <section class="close-panel">
    <div class="close-panel-head"><div><span class="eyebrow">FOTOGRAFÍA GUARDADA</span><h3>Estado al cerrar</h3></div><span><?=e(date('d/m/Y',strtotime($closure['closed_at'])))?></span></div>
-   <div class="close-metrics"><p><span>Ingresos</span><b><?=e(close_money($saved['summary']['income']??0))?></b></p><p><span>Gastos</span><b><?=e(close_money($saved['summary']['expense']??0))?></b></p><p><span>Neto</span><b><?=e(close_money($saved['summary']['balance']??0))?></b></p><p><span>Pendiente</span><b><?=e(close_money($saved['summary']['pending_total']??0))?></b></p></div>
+   <div class="close-metrics"><p><span>Ingresos</span><b><?=e(close_money($saved['summary']['income']??0))?></b></p><p><span>Gastos</span><b><?=e(close_money($saved['summary']['expense']??0))?></b></p><p><span>Neto</span><b><?=e(close_money($saved['summary']['balance']??0))?></b></p><p><span>Pendiente</span><b><?=e(close_money($savedCommitments['pending']))?></b></p></div>
+   <div class="close-commitment-snapshot"><span>Comprometido <b><?=e(close_money($savedCommitments['committed']))?></b></span><span>Pagado <b><?=e(close_money($savedCommitments['paid']))?></b></span><span>Pendiente <b><?=e(close_money($savedCommitments['pending']))?></b></span></div>
   </section>
   <section class="close-panel <?=$changedAfterClose?'has-changes':''?>">
    <div class="close-panel-head"><div><span class="eyebrow">ESTADO ACTUAL</span><h3><?= $changedAfterClose?'Cambió después del cierre':'Sin cambios' ?></h3></div><span>Ahora</span></div>
-   <div class="close-metrics"><p><span>Ingresos</span><b><?=e(close_money($current['summary']['income']??0))?></b></p><p><span>Gastos</span><b><?=e(close_money($current['summary']['expense']??0))?></b></p><p><span>Neto</span><b><?=e(close_money($current['summary']['balance']??0))?></b></p><p><span>Pendiente</span><b><?=e(close_money($current['summary']['pending_total']??0))?></b></p></div>
+   <div class="close-metrics"><p><span>Ingresos</span><b><?=e(close_money($current['summary']['income']??0))?></b></p><p><span>Gastos</span><b><?=e(close_money($current['summary']['expense']??0))?></b></p><p><span>Neto</span><b><?=e(close_money($current['summary']['balance']??0))?></b></p><p><span>Pendiente</span><b><?=e(close_money($currentCommitments['pending']))?></b></p></div>
+   <div class="close-commitment-snapshot"><span>Comprometido <b><?=e(close_money($currentCommitments['committed']))?></b></span><span>Pagado <b><?=e(close_money($currentCommitments['paid']))?></b></span><span>Pendiente <b><?=e(close_money($currentCommitments['pending']))?></b></span></div>
   </section>
  </div>
  <?php endif;?>
 
  <div class="close-detail-grid">
   <section class="table-card close-panel-table"><div class="table-card-head"><strong>Cuentas</strong><span>Fotografía actual</span></div><div class="close-simple-list"><?php foreach($current['accounts'] as $a):?><div><span><?=e($a['name'])?></span><b><?=e(close_money($a['balance']))?></b></div><?php endforeach;?></div></section>
-  <section class="table-card close-panel-table"><div class="table-card-head"><strong>Compromisos de <?=e($period)?></strong><span><?=count($current['payments'])?></span></div><div class="close-simple-list"><?php foreach($current['payments'] as $p):?><div><span><b><?=e($p['name'])?></b><small><?=e(close_status_label($p['status']))?> · vence <?=e(date('d/m',strtotime($p['due_date'])))?></small></span><b><?=e(close_money($p['remaining_amount']))?></b></div><?php endforeach;?><?php if(!$current['payments']):?><div class="empty">Sin pagos fijos en este mes.</div><?php endif;?></div></section>
+  <section class="table-card close-panel-table">
+   <div class="table-card-head"><strong>Compromisos de <?=e($periodLabel)?></strong><span><?=count($current['payments'])?></span></div>
+   <div class="close-commitment-totals">
+    <div><span>Comprometido</span><b><?=e(close_money($currentCommitments['committed']))?></b></div>
+    <div><span>Pagado</span><b><?=e(close_money($currentCommitments['paid']))?></b></div>
+    <div><span>Pendiente</span><b><?=e(close_money($currentCommitments['pending']))?></b></div>
+   </div>
+   <div class="close-simple-list close-payment-list">
+    <?php foreach($current['payments'] as $p):
+      $paymentStatus=(string)($p['status']??'pending');
+      $paymentAmount=(float)($p['amount']??0);
+      $paymentPaid=(float)($p['paid_amount']??0);
+      $paymentRemaining=(float)($p['remaining_amount']??0);
+    ?>
+    <div class="close-payment-row">
+     <span class="close-payment-info"><b><?=e($p['name'])?></b><small><?=e(close_status_label($paymentStatus))?> · vence <?=e(date('d/m',strtotime($p['due_date'])))?></small></span>
+     <span class="close-payment-values">
+      <b><?=e(close_money($paymentAmount))?></b>
+      <?php if($paymentStatus==='skipped'):?><small>Omitido este mes</small>
+      <?php elseif($paymentStatus==='paid'):?><small>Pagado <?=e(close_money($paymentPaid))?> · Pendiente S/ 0.00</small>
+      <?php elseif($paymentStatus==='partial'):?><small>Pagado <?=e(close_money($paymentPaid))?> · Pendiente <?=e(close_money($paymentRemaining))?></small>
+      <?php else:?><small>Pagado <?=e(close_money($paymentPaid))?> · Pendiente <?=e(close_money($paymentRemaining))?></small><?php endif;?>
+     </span>
+    </div>
+    <?php endforeach;?>
+    <?php if(!$current['payments']):?><div class="empty">Sin pagos fijos en este mes.</div><?php endif;?>
+   </div>
+  </section>
  </div>
  <?php if($closure&&!empty($closure['notes'])):?><div class="close-notes"><span>Nota del cierre</span><p><?=e($closure['notes'])?></p></div><?php endif;?>
 </div>

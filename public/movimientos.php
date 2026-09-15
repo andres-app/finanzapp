@@ -2,6 +2,7 @@
 require __DIR__.'/../app/bootstrap.php';
 $uid=require_auth();FinanceSchema::ensure($uid);require __DIR__.'/../app/layout.php';
 $period=$_GET['period']??date('Y-m');[$s,$e2]=month_range($period);
+$statementAccounts=FinanceService::accountBalances($uid);
 
 $st=db()->prepare("SELECT t.*,c.name category,c.icon,co.name concept,a.name account,a.icon account_icon,f.name fund,f.icon fund_icon,u.name actor_name FROM transactions t JOIN categories c ON c.id=t.category_id LEFT JOIN concepts co ON co.id=t.concept_id LEFT JOIN financial_accounts a ON a.id=t.account_id LEFT JOIN funds f ON f.id=t.fund_id LEFT JOIN users u ON u.id=COALESCE(t.created_by_user_id,t.user_id) WHERE t.user_id=? AND t.voided_at IS NULL AND t.occurred_at>=? AND t.occurred_at<? ORDER BY t.occurred_at DESC");
 $st->execute([$uid,$s,$e2]);$rows=$st->fetchAll();
@@ -61,6 +62,14 @@ page_top('Movimientos','movimientos');
 <div class="page-wrap finance-page">
  <div class="page-head finance-page-head"><div><span class="eyebrow">HISTORIAL</span><h1>Movimientos</h1><p>Ingresos y egresos afectan tu patrimonio. Ahorro y transferencias solo organizan tu propio dinero.</p></div><form class="page-filter"><input type="month" name="period" value="<?=e($period)?>" onchange="this.form.submit()"></form></div>
  <div class="movement-summary"><div><span>Ingresos</span><strong class="amount-in">+ S/ <?=number_format($income,2)?></strong></div><div><span>Gastos</span><strong class="amount-out">− S/ <?=number_format($expense,2)?></strong></div><div><span>Neto del mes</span><strong>S/ <?=number_format($income-$expense,2)?></strong></div><div><span>Movimientos internos</span><strong><?=count($transfers)+count($adjustments)+count($savingsRows)+count($fundRows)?></strong></div></div>
+ <section class="statement-export-card" data-statement-export>
+   <div class="statement-export-copy"><span>ESTADO DE CUENTA</span><h2>Descarga tu mes como en el banco, pero más simple</h2><p>Incluye saldo inicial, entradas, salidas, saldo final y el detalle de cada movimiento.</p></div>
+   <div class="statement-export-controls">
+     <label><span>Cuenta</span><select id="statementAccount"><option value="0">Todas las cuentas · consolidado</option><?php foreach($statementAccounts as $a):?><option value="<?=$a['id']?>"><?=e(($a['icon']?:'🏦').' '.$a['name'])?></option><?php endforeach;?></select></label>
+     <a class="statement-download pdf" id="statementPdf" data-no-spa download href="<?=e(app_url('api/statement_export.php?format=pdf&period='.rawurlencode($period).'&account_id=0'))?>"><span>PDF</span><b>Estado bonito</b></a>
+     <a class="statement-download excel" id="statementExcel" data-no-spa download href="<?=e(app_url('api/statement_export.php?format=excel&period='.rawurlencode($period).'&account_id=0'))?>"><span>Excel</span><b>Para revisar</b></a>
+   </div>
+ </section>
  <div class="table-card"><div class="table-card-head"><strong>Actividad del mes</strong><span><?=count($activity)?> movimientos</span></div><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Cuenta</th><th>Categoría / concepto</th><th>Fondo</th><th>Detalle</th><th class="right">Monto</th></tr></thead><tbody>
  <?php foreach($activity as $item): $r=$item['row']; ?>
    <?php if($item['kind']==='transaction'): ?>
@@ -76,5 +85,15 @@ page_top('Movimientos','movimientos');
  <?php if(!$activity):?><tr><td colspan="7" class="empty">Todavía no hay actividad en este mes.</td></tr><?php endif;?></tbody></table></div></div>
  <?php if($adjustments):?><div class="table-card transfer-table"><div class="table-card-head"><strong>Ajustes de saldo</strong><span>Conciliaciones; no son ingresos ni gastos</span></div><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Cuenta</th><th>Motivo</th><th class="right">Ajuste</th></tr></thead><tbody><?php foreach($adjustments as $r):?><tr><td><?=e(date('d/m/Y H:i',strtotime($r['occurred_at'])))?></td><td><?=e(($r['account_icon']?:'🏦').' '.$r['account'])?></td><td><?=e($r['note']?:'Ajuste de saldo')?></td><td class="right"><strong class="<?=$r['amount']>=0?'amount-in':'amount-out'?>"><?=$r['amount']>=0?'+':'−'?> S/ <?=number_format(abs((float)$r['amount']),2)?></strong></td></tr><?php endforeach;?></tbody></table></div></div><?php endif;?>
 </div>
+<script>
+(() => {
+  const account=document.getElementById('statementAccount'),pdf=document.getElementById('statementPdf'),excel=document.getElementById('statementExcel'),periodInput=document.querySelector('.page-filter input[name="period"]');
+  if(periodInput)periodInput.onchange=()=>{const url=<?=json_encode(app_url('movimientos'))?>+'?period='+encodeURIComponent(periodInput.value);window.MiDinero?.softNavigate?MiDinero.softNavigate(url,{push:true}):location.assign(url);};
+  if(!account||!pdf||!excel)return;
+  const period=<?=json_encode($period)?>,base=<?=json_encode(app_url('api/statement_export.php'))?>;
+  const sync=()=>{const aid=account.value||'0';pdf.href=`${base}?format=pdf&period=${encodeURIComponent(period)}&account_id=${encodeURIComponent(aid)}`;excel.href=`${base}?format=excel&period=${encodeURIComponent(period)}&account_id=${encodeURIComponent(aid)}`;};
+  account.addEventListener('change',sync);sync();
+})();
+</script>
 <script src="<?=e(app_url('assets/js/realtime-view.js'))?>?v=<?=e((string)@filemtime(__DIR__.'/../assets/js/realtime-view.js'))?>"></script>
 <?php page_bottom(); ?>

@@ -162,7 +162,7 @@ window.MiDineroRegister('dashboard', () => {
     setText('#incomeChange',`${s.income_change>=0?'+':''}${Number(s.income_change).toFixed(1)}% vs. mes anterior`);
     setText('#expenseChange',`${s.expense_change>=0?'+':''}${Number(s.expense_change).toFixed(1)}% vs. mes anterior`);
     setText('#quickUnallocated',money(s.unallocated));
-    renderSavings(d.savings||{});renderFunds((d.funds||[]).filter(f=>!f.savings_goal_id));renderPending(d.pending_current||d.pending);renderAnt(d.ant_expenses,s.ant,s.ant_projected);renderRecent(d.recent||[]);
+    renderSavings(d.savings||{});renderFunds((d.funds||[]).filter(f=>!f.savings_goal_id));renderPending(d.pending_current||d.pending);renderAnt(d.ant_expenses,s.ant,s.ant_projected);renderRecent(d.recent||[]);renderSpendingStory(d.categories||[],d.top_expenses||[],Number(s.expense||0),Number(s.ant||0));
     try{renderChart(d.daily);}catch(err){console.error('No se pudo renderizar el gráfico:',err);}
   }
 
@@ -251,6 +251,27 @@ window.MiDineroRegister('dashboard', () => {
     }).join(''):'<div class="empty compact">Todavía no hay movimientos registrados.</div>';
   }
   function renderCategories(rows){const total=rows.reduce((a,r)=>a+Number(r.total),0)||1;$('#categoryBars').innerHTML=rows.length?rows.slice(0,4).map(r=>{const p=Math.round(+r.total/total*100);return `<div class="category-row"><span class="category-icon">${esc(r.icon||'•')}</span><div><div><b>${esc(r.name)}</b><strong>${money(r.total)}</strong></div><div class="thin-progress"><i style="width:${p}%;background:${safeColor(r.color)}"></i></div><small>${p}% del gasto</small></div></div>`}).join(''):'<div class="empty compact">Aún no hay egresos.</div>';}
+
+  function renderSpendingStory(categories,topExpenses,totalExpense,antTotal){
+    const total=Math.max(0,Number(totalExpense||0));
+    setText('#spendingStoryTotal',money(total));
+    const catBox=$('#spendingStoryCategories'),topBox=$('#spendingStoryTop'),headline=$('#spendingStoryHeadline'),tip=$('#spendingStoryTip');
+    const rows=(categories||[]).filter(r=>Number(r.total)>0);
+    if(!rows.length||total<=0.005){
+      if(catBox)catBox.innerHTML='<div class="spending-story-empty">Todavía no hay gastos en este mes.</div>';
+      if(topBox)topBox.innerHTML='<div class="spending-story-empty">Tus gastos más altos aparecerán cuando registres movimientos.</div>';
+      if(headline)headline.textContent='Cuando registres gastos, aquí te explicaremos cuáles pesan más en tu mes.';
+      if(tip)tip.textContent='Este panel usa únicamente gastos realmente registrados.';
+      return;
+    }
+    const topCat=rows[0],topPct=Math.round(Number(topCat.total)/total*100);
+    if(headline)headline.innerHTML=`De cada <b>S/ 100</b> que salieron este mes, aproximadamente <b>S/ ${topPct}</b> fueron a ${esc(topCat.name)}.`;
+    const antPct=total>0?Math.round(Number(antTotal||0)/total*100):0;
+    if(tip)tip.textContent=antPct>=10?`Los gastos hormiga representan ${antPct}% de lo gastado este mes.`:`Tu categoría con más gasto es ${topCat.name}, con ${money(topCat.total)}.`;
+    if(catBox)catBox.innerHTML=rows.slice(0,5).map((r,i)=>{const pct=Math.max(1,Math.round(Number(r.total)/total*100));return `<div class="spending-story-bar-row"><div class="spending-story-bar-title"><span><i>${esc(r.icon||'•')}</i><b>${esc(r.name)}</b></span><strong>${money(r.total)}</strong></div><div class="spending-story-bar"><i style="width:${Math.min(100,pct)}%;background:${safeColor(r.color)}"></i></div><small>${pct}% del total${i===0?' · principal gasto':''}</small></div>`}).join('');
+    const top=(topExpenses||[]).slice(0,4);
+    if(topBox)topBox.innerHTML=top.length?top.map((r,i)=>{const when=String(r.occurred_at||'').slice(0,10).split('-').reverse().join('/');return `<div class="spending-story-top-row"><span>${i+1}</span><div><b>${esc(r.concept||r.category||'Gasto')}</b><small>${esc(r.account||'Cuenta')} · ${esc(when)}</small></div><strong>${money(r.amount)}</strong></div>`}).join(''):'<div class="spending-story-empty">Sin gastos para destacar.</div>';
+  }
 
   // ===== Acciones rápidas independientes =====
   const actionModals={expense:$('#expenseModal'),income:$('#incomeModal'),transfer:$('#transferModal'),allocate:$('#allocateModal')};

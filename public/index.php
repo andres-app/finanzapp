@@ -78,6 +78,28 @@ page_top('Dashboard','dashboard');
     <span id="incomeChange" class="sr-only"></span><span id="expenseChange" class="sr-only"></span><span id="antProjection" class="sr-only"></span><span id="quickUnallocated" class="sr-only"></span>
   </section>
 
+  <section class="minimal-panel spending-story-panel">
+    <div class="minimal-panel-head spending-story-head">
+      <div><span>LECTURA DEL MES</span><h2>¿En qué se fue mi dinero?</h2><p>Una explicación simple de tus gastos, sin gráficos complicados.</p></div>
+      <a class="minimal-link" href="<?=e(app_url('movimientos'))?>">Ver movimientos</a>
+    </div>
+    <div class="spending-story-grid">
+      <div class="spending-story-summary">
+        <span>TOTAL GASTADO</span><strong id="spendingStoryTotal">S/ 0.00</strong>
+        <p id="spendingStoryHeadline">Cuando registres gastos, aquí te explicaremos cuáles pesan más en tu mes.</p>
+        <div class="spending-story-tip" id="spendingStoryTip">Tus categorías más importantes aparecerán aquí.</div>
+      </div>
+      <div class="spending-story-categories">
+        <div class="spending-story-subhead"><b>Por categoría</b><span>Participación del gasto</span></div>
+        <div id="spendingStoryCategories" class="spending-story-bars"></div>
+      </div>
+      <div class="spending-story-top">
+        <div class="spending-story-subhead"><b>Gastos más altos</b><span>Los que más movieron tu mes</span></div>
+        <div id="spendingStoryTop" class="spending-story-top-list"></div>
+      </div>
+    </div>
+  </section>
+
   <section class="minimal-dashboard-grid">
     <article class="minimal-panel minimal-payments-panel">
       <div class="minimal-panel-head">
