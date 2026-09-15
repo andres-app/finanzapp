@@ -280,6 +280,7 @@
   function queueRealtime(events) {
     if (!events?.length) return;
     pendingRealtimeEvents.push(...events);
+    window.dispatchEvent(new CustomEvent('midinero:realtime', {detail:{events}}));
     clearTimeout(realtimeTimer);
     realtimeTimer = setTimeout(applyRealtimeRefresh, 180);
   }
