@@ -42,7 +42,7 @@ window.MiDineroRegister('dashboard', () => {
   const api = f => `${APP.apiBase}/${f}`;
   let chart=null;
   let config=window.FINANCE_FORM_DATA||{categories:[],concepts:[],accounts:[],funds:[],income_defaults:[]};
-  let currentPayment=null, currentData=null, loading=false, queued=false, timer=null, toastTimer=null;
+  let currentPayment=null, currentPlan=null, currentData=null, loading=false, queued=false, timer=null, toastTimer=null;
 
   async function json(url,opt={}){
     const options={...opt,signal:opt?.signal||pageAbort.signal};
@@ -212,15 +212,33 @@ window.MiDineroRegister('dashboard', () => {
   function renderFunds(rows){const box=$('#fundCards');if(!box)return;box.innerHTML=rows.length?rows.slice(0,4).map(f=>{const avail=+f.available,target=+f.target_amount,p=target>0?Math.min(100,Math.max(0,avail/target*100)):0;return `<a class="fund-mini-card" href="${APP.routes.fondos}"><span class="fund-mini-icon">${esc(f.icon||'💰')}</span><div><b>${esc(f.name)}</b><strong>${money(avail)}</strong><div class="thin-progress"><i style="width:${p}%;background:${safeColor(f.color)}"></i></div><small>${target>0?`Meta ${money(target)}`:`Disponible ahora`}</small></div></a>`}).join(''):'<div class="empty compact">Crea un fondo para organizar tus gastos.</div>';}
   function renderAccounts(rows){const box=$('#accountCards');if(!box)return;box.innerHTML=rows.length?rows.map(a=>`<a class="account-mini-row" href="${APP.routes.cuentas}"><span>${esc(a.icon||'🏦')}</span><div><b>${esc(a.name)}</b><small>${a.account_type==='bank'?'Banco':a.account_type==='wallet'?'Billetera':a.account_type==='cash'?'Efectivo':'Otra cuenta'}</small></div><strong>${money(a.balance)}</strong></a>`).join(''):'<div class="empty compact">Sin cuentas.</div>';}
   function paymentDueLabel(r){const n=Number(r.days_left);if(n<0)return {text:`Vencido hace ${Math.abs(n)} día${Math.abs(n)===1?'':'s'}`,tone:'overdue'};if(n===0)return {text:'Vence hoy',tone:'today'};if(n===1)return {text:'Vence mañana',tone:'soon'};if(n<=7)return {text:`Vence en ${n} días`,tone:'soon'};return {text:`Vence ${r.due_date.split('-').reverse().join('/')}`,tone:'normal'};}
+  function paymentRowById(id){
+    const all=[...(currentData?.pending_current||[]),...(currentData?.pending||[]),...(currentData?.payments_current||[])];
+    return all.find(r=>String(r.id)===String(id))||null;
+  }
   function renderPending(rows){
     rows=Array.isArray(rows)?rows:[];
-    const total=rows.reduce((a,r)=>a+Number(r.amount||0),0),box=$('#railPendingList');
+    const skipped=(currentData?.payments_current||[]).filter(r=>r.status==='skipped');
+    const total=rows.reduce((a,r)=>a+Number(r.remaining_amount??r.amount??0),0),box=$('#railPendingList');
     setText('#railPendingTotal',money(total));
     if(!box)return;
-    if(!rows.length){box.innerHTML='<div class="rail-all-paid"><span>✓</span><b>Todo está pagado</b><small>No tienes pagos fijos vencidos ni pendientes por cubrir.</small></div>';return;}
-    const visible=rows.slice(0,4);
-    box.innerHTML=visible.map(r=>{const due=paymentDueLabel(r),amount=Number(r.amount||0);return `<article class="rail-payment-item ${due.tone}"><div class="rail-payment-icon">${esc(r.icon||'•')}</div><div class="rail-payment-info"><div class="rail-payment-title"><b>${esc(r.name)}</b><strong>${money(amount)}</strong></div><div class="rail-payment-bottom"><span class="rail-due ${due.tone}">${due.text}</span><button class="rail-pay-btn" type="button" data-pay="${r.id}" data-name="${esc(r.name)}" data-icon="${esc(r.icon||'•')}" data-amount="${r.amount}" data-due="${r.due_date}" data-fund="${r.fund_id||''}">Pagar</button></div></div></article>`}).join('')+(rows.length>4?`<a class="minimal-more-payments" href="${APP.routes.configuracion}/pagos">+ ${rows.length-4} pago${rows.length-4===1?'':'s'} más</a>`:'');
-    $$('[data-pay]').forEach(b=>b.onclick=()=>openPay(b.dataset));
+    if(!rows.length&&!skipped.length){box.innerHTML='<div class="rail-all-paid"><span>✓</span><b>Todo está pagado</b><small>No tienes pagos fijos vencidos ni pendientes por cubrir.</small></div>';return;}
+    const visible=rows;
+    const pendingHtml=visible.map(r=>{
+      const due=paymentDueLabel(r),amount=Number(r.amount||0),paid=Number(r.paid_amount||0),remaining=Number(r.remaining_amount??Math.max(0,amount-paid));
+      const partial=paid>0.005&&remaining>0.005;
+      const previous=Number(r.previous_amount||0),increase=previous>0&&amount>previous+0.005?amount-previous:0;
+      const flags=[];
+      if(partial)flags.push(`<span class="rail-partial-badge">Abonado ${money(paid)} de ${money(amount)}</span>`);
+      if(increase>0.005)flags.push(`<span class="rail-change-badge">Subió ${money(increase)}</span>`);
+      if(Number(r.amount_overridden)||Number(r.due_date_overridden))flags.push('<span class="rail-month-badge">Ajustado este mes</span>');
+      return `<article class="rail-payment-item ${due.tone} ${partial?'is-partial':''}"><div class="rail-payment-icon">${esc(r.icon||'•')}</div><div class="rail-payment-info"><div class="rail-payment-title"><b>${esc(r.name)}</b><strong>${money(remaining)}</strong></div>${flags.length?`<div class="rail-payment-flags">${flags.join('')}</div>`:''}<div class="rail-payment-bottom"><span class="rail-due ${due.tone}">${due.text}</span><div class="rail-payment-actions"><button class="rail-plan-btn" type="button" data-plan="${r.id}" aria-label="Editar solo este mes">•••</button><button class="rail-pay-btn" type="button" data-pay="${r.id}">${partial?'Pagar saldo':'Pagar'}</button></div></div></div></article>`;
+    }).join('');
+    const more='';
+    const skippedHtml=skipped.length?`<div class="rail-skipped-group"><div class="rail-skipped-head"><span>Omitidos este mes</span><b>${skipped.length}</b></div>${skipped.slice(0,3).map(r=>`<div class="rail-skipped-row"><span>${esc(r.icon||'•')}</span><div><b>${esc(r.name)}</b><small>${money(r.amount)} · no se contará como pendiente</small></div><button type="button" data-plan="${r.id}">Revisar</button></div>`).join('')}</div>`:'';
+    box.innerHTML=pendingHtml+more+skippedHtml;
+    $$('[data-pay]').forEach(b=>b.onclick=()=>{const row=paymentRowById(b.dataset.pay);if(row)openPay(row);});
+    $$('[data-plan]').forEach(b=>b.onclick=()=>{const row=paymentRowById(b.dataset.plan);if(row)openPlan(row);});
   }
   function renderAnt(rows,total,projected){setText('#antTotal',money(total));setText('#antProjection',projected>total?`Proyección ${money(projected)} al cierre`:'Pequeños gastos del mes');const box=$('#antList');if(!box)return;box.innerHTML=rows.length?rows.map(r=>`<div class="task-row"><span class="task-icon">${esc(r.icon||'•')}</span><div class="task-name"><b>${esc(r.name)}</b><small>${r.qty} movimiento${+r.qty!==1?'s':''}</small></div><strong>${money(r.total)}</strong></div>`).join(''):'<div class="empty compact">Sin gastos hormiga este mes.</div>';}
   function renderRecent(rows){
@@ -355,11 +373,43 @@ window.MiDineroRegister('dashboard', () => {
   $('#transferQuickForm').onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target).entries()),b=e.submitter;d.amount=moneyFieldRaw(e.target.querySelector('[name="amount"]'));b.disabled=true;b.textContent='Moviendo...';try{await json(api('account_transfer.php'),{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':APP.csrf},body:JSON.stringify(d)});e.target.reset();e.target.querySelector('[name="occurred_at"]').value=nowLocal();closeActionModal('transfer');toast('Dinero movido entre tus cuentas');await Promise.all([load(),loadConfig()]);}catch(err){toast(err.message,'error')}finally{b.disabled=false;b.textContent='Mover dinero'}};
   $('#allocateQuickForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.target),fid=fd.get('fund_id'),amount=parseMoneyInput(fd.get('amount')),b=e.submitter;b.disabled=true;b.textContent='Separando...';try{await json(api('fund_allocate.php'),{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':APP.csrf},body:JSON.stringify({allocations:{[fid]:amount},note:'Asignación rápida desde dashboard'})});e.target.reset();closeActionModal('allocate');toast('Dinero separado en tu fondo');await Promise.all([load(),loadConfig()]);}catch(err){toast(err.message,'error')}finally{b.disabled=false;b.textContent='Separar dinero'}};
 
-  // Pagos pendientes
-  function openPay(d){currentPayment=d;$('#payId').value=d.pay;$('#payName').textContent=d.name;$('#payIcon').textContent=d.icon||'⌂';$('#payReference').textContent=money(d.amount);moneyFieldSet($('#payAmount'),Number(d.amount)>0?Number(d.amount):'');$('#payDue').textContent='Vence '+d.due.split('-').reverse().join('/');renderPayOptions();const linked=(config.funds||[]).find(f=>String(f.id)===String(d.fund));if(linked&&Number(linked.available||0)+0.005>=Number(d.amount||0)&&[...$('#payFund').options].some(o=>o.value===String(d.fund)))$('#payFund').value=String(d.fund);else $('#payFund').value='';$('#payModal').classList.add('show');$('#payModal').setAttribute('aria-hidden','false');}
-  function closePay(){$('#payModal').classList.remove('show');currentPayment=null;}
+  // Pagos pendientes: soporta abonos parciales sin cerrar el compromiso antes de tiempo.
+  function openPay(d){
+    currentPayment=d;
+    const total=Number(d.amount||0),paid=Number(d.paid_amount||0),remaining=Number(d.remaining_amount??Math.max(0,total-paid));
+    $('#payId').value=d.id;$('#payName').textContent=d.name;$('#payIcon').textContent=d.icon||'⌂';$('#payReference').textContent=money(total);
+    moneyFieldSet($('#payAmount'),remaining>0?remaining:'');$('#payDue').textContent='Vence '+String(d.due_date||'').split('-').reverse().join('/');
+    const summary=$('#payPartialSummary');if(summary){summary.hidden=paid<=0.005;setText('#payAlreadyPaid',money(paid));setText('#payRemaining',money(remaining));}
+    setText('#payAmountHelp',paid>0.005?`Puedes completar el saldo o registrar otro abono menor a ${money(remaining)}.`:'Si pagas menos del total, el resto seguirá pendiente automáticamente.');
+    renderPayOptions();const linked=(config.funds||[]).find(f=>String(f.id)===String(d.fund_id));if(linked&&Number(linked.available||0)+0.005>=remaining&&[...$('#payFund').options].some(o=>o.value===String(d.fund_id)))$('#payFund').value=String(d.fund_id);else $('#payFund').value='';
+    $('#payModal').classList.add('show');$('#payModal').setAttribute('aria-hidden','false');
+  }
+  function closePay(){$('#payModal').classList.remove('show');$('#payModal').setAttribute('aria-hidden','true');currentPayment=null;}
   $$('[data-pay-close]').forEach(b=>b.onclick=closePay);
-  $('#payForm').onsubmit=async e=>{e.preventDefault();if(!currentPayment)return;const btn=$('#paySubmit');btn.disabled=true;btn.textContent='Registrando...';try{await json(api('payment_mark.php'),{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':APP.csrf},body:JSON.stringify({id:currentPayment.pay,amount:moneyFieldRaw($('#payAmount')),payment_method:$('#payMethod').value,account_id:$('#payAccount').value,fund_id:$('#payFund').value})});localStorage.setItem('fin_last_account',$('#payAccount').value);closePay();toast('Pago registrado');await Promise.all([load(),loadConfig()]);}catch(err){toast(err.message,'error')}finally{btn.disabled=false;btn.textContent='✓ Registrar pago'}};
+  $('#payForm').onsubmit=async e=>{e.preventDefault();if(!currentPayment)return;const btn=$('#paySubmit');btn.disabled=true;btn.textContent='Registrando...';try{const result=await json(api('payment_mark.php'),{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':APP.csrf},body:JSON.stringify({id:currentPayment.id,amount:moneyFieldRaw($('#payAmount')),payment_method:$('#payMethod').value,account_id:$('#payAccount').value,fund_id:$('#payFund').value})});localStorage.setItem('fin_last_account',$('#payAccount').value);closePay();toast(result.status==='partial'?`Abono registrado. Falta ${money(result.remaining_amount)}`:'Pago completado');await Promise.all([load(),loadConfig()]);}catch(err){toast(err.message,'error')}finally{btn.disabled=false;btn.textContent='✓ Registrar pago'}};
+
+  // Excepción mensual: modifica solo la obligación elegida, nunca el pago fijo base.
+  function planStatusLabel(status){return status==='partial'?'Pago parcial':status==='skipped'?'Omitido':status==='paid'?'Pagado':'Pendiente';}
+  function openPlan(d){
+    currentPlan=d;const paid=Number(d.paid_amount||0),skipped=d.status==='skipped';
+    $('#planId').value=d.id;$('#planName').textContent=d.name;$('#planBaseAmount').textContent=money(d.recurring_amount??d.amount);$('#planState').textContent=planStatusLabel(d.status);
+    moneyFieldSet($('#planAmount'),d.amount);$('#planDue').value=d.due_date||'';
+    const info=$('#planPaidInfo');if(info){info.hidden=paid<=0.005;setText('#planPaidAmount',money(paid));}
+    const period=String(d.period||String(d.due_date||'').slice(0,7));if(/^\d{4}-\d{2}$/.test(period)){const [y,m]=period.split('-').map(Number),last=new Date(y,m,0).getDate();$('#planDue').min=`${period}-01`;$('#planDue').max=`${period}-${String(last).padStart(2,'0')}`;}
+    $('#planAmount').disabled=skipped;$('#planDue').disabled=skipped;$('#planSave').hidden=skipped;$('#planRestore').hidden=!skipped;$('#planSkip').hidden=skipped||paid>0.005;$('#planReset').hidden=skipped;
+    $('#paymentMonthModal').classList.add('show');$('#paymentMonthModal').setAttribute('aria-hidden','false');
+  }
+  function closePlan(){$('#paymentMonthModal').classList.remove('show');$('#paymentMonthModal').setAttribute('aria-hidden','true');currentPlan=null;}
+  async function applyPlanAction(action,payload={}){
+    if(!currentPlan)return null;
+    return json(api('payment_month_update.php'),{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':APP.csrf},body:JSON.stringify({id:currentPlan.id,action,...payload})});
+  }
+  $$('[data-plan-close]').forEach(b=>b.onclick=closePlan);
+  $('#paymentMonthForm').onsubmit=async e=>{e.preventDefault();if(!currentPlan)return;const btn=$('#planSave');btn.disabled=true;btn.textContent='Guardando...';try{await applyPlanAction('save',{amount:moneyFieldRaw($('#planAmount')),due_date:$('#planDue').value});closePlan();toast('Cambio aplicado solo a este mes');await load();}catch(err){toast(err.message,'error')}finally{btn.disabled=false;btn.textContent='Guardar solo este mes'}};
+  $('#planReset').onclick=async()=>{const b=$('#planReset');b.disabled=true;try{await applyPlanAction('reset');closePlan();toast('Se restauró el valor fijo para este mes');await load();}catch(err){toast(err.message,'error')}finally{b.disabled=false;}};
+  $('#planSkip').onclick=async()=>{const b=$('#planSkip');b.disabled=true;b.textContent='Omitiendo...';try{await applyPlanAction('skip');closePlan();toast('Pago omitido solo este mes');await load();}catch(err){toast(err.message,'error')}finally{b.disabled=false;b.textContent='Omitir este mes';}};
+  $('#planRestore').onclick=async()=>{const b=$('#planRestore');b.disabled=true;try{await applyPlanAction('restore');closePlan();toast('Compromiso restaurado');await load();}catch(err){toast(err.message,'error')}finally{b.disabled=false;}};
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){if($('#paymentMonthModal')?.classList.contains('show'))closePlan();else if($('#payModal')?.classList.contains('show'))closePay();}},{signal:pageAbort.signal});
 
   function shift(delta){const [y,m]=$('#period').value.split('-').map(Number),d=new Date(y,m-1+delta,1);$('#period').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;load();}
   $('#prevMonth').onclick=()=>shift(-1);$('#nextMonth').onclick=()=>shift(1);$('#period').onchange=load;

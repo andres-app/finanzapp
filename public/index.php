@@ -209,13 +209,24 @@ page_top('Dashboard','dashboard');
 
 <div class="quick-toast" id="quickToast" role="status" aria-live="polite"></div>
 
-<div class="modal" id="payModal" aria-hidden="true"><div class="modal-card payment-modal-card"><div class="modal-head payment-modal-head"><div><span>REGISTRAR PAGO</span><h3>Confirmar pago</h3><p>Indica de dónde salió el dinero. El monto puede ser distinto al referencial.</p></div><button class="modal-x" type="button" data-pay-close>×</button></div><form id="payForm"><input type="hidden" id="payId">
-  <div class="payment-concept-card"><span class="payment-concept-icon" id="payIcon">⌂</span><div class="payment-concept-info"><small>Concepto</small><strong id="payName">Pago mensual</strong><span id="payDue">Vencimiento</span></div><div class="payment-reference"><small>Monto referencial</small><strong id="payReference">S/ 0.00</strong></div></div>
+<div class="modal" id="payModal" aria-hidden="true"><div class="modal-card payment-modal-card"><div class="modal-head payment-modal-head"><div><span>REGISTRAR PAGO</span><h3>Confirmar pago</h3><p>Puedes pagar todo el saldo o hacer un abono parcial. Solo se descuenta lo que realmente pagues.</p></div><button class="modal-x" type="button" data-pay-close>×</button></div><form id="payForm"><input type="hidden" id="payId">
+  <div class="payment-concept-card"><span class="payment-concept-icon" id="payIcon">⌂</span><div class="payment-concept-info"><small>Concepto</small><strong id="payName">Pago mensual</strong><span id="payDue">Vencimiento</span></div><div class="payment-reference"><small>Total del mes</small><strong id="payReference">S/ 0.00</strong></div></div>
+  <div class="payment-partial-summary" id="payPartialSummary" hidden><div><span>Ya pagaste</span><strong id="payAlreadyPaid">S/ 0.00</strong></div><div><span>Saldo pendiente</span><strong id="payRemaining">S/ 0.00</strong></div></div>
   <div class="form-grid pay-source-grid"><div class="account-select-field"><label>¿Desde qué cuenta?</label><select id="payAccount" required></select><small id="payAccountHint" class="account-select-hint"></small></div><div><label>¿Usar un fondo?</label><select id="payFund"><option value="">No, dinero libre</option></select></div></div>
-  <div class="payment-amount-block"><label for="payAmount">Monto pagado</label><div class="payment-money-input money-entry-shell"><span>S/</span><input id="payAmount" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" data-money-input required></div><p>Este monto se registrará como gasto.</p></div>
+  <div class="payment-amount-block"><label for="payAmount">Monto a pagar ahora</label><div class="payment-money-input money-entry-shell"><span>S/</span><input id="payAmount" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" data-money-input required></div><p id="payAmountHelp">Este monto se registrará como gasto.</p></div>
   <div class="payment-method-block"><label for="payMethod">Medio de pago</label><select id="payMethod"><option>Transferencia</option><option>Yape</option><option>Plin</option><option>Tarjeta</option><option>Efectivo</option></select></div>
   <div class="payment-modal-actions"><button class="btn payment-cancel" type="button" data-pay-close>Cancelar</button><button class="btn primary payment-confirm" id="paySubmit" type="submit">✓ Registrar pago</button></div>
 </form></div></div>
+
+<div class="modal" id="paymentMonthModal" aria-hidden="true"><div class="modal-card payment-month-modal-card"><div class="modal-head payment-modal-head"><div><span>SOLO ESTE MES</span><h3 id="planName">Editar compromiso</h3><p>Cambia el importe o vencimiento de este mes sin modificar el pago fijo de los siguientes meses.</p></div><button class="modal-x" type="button" data-plan-close>×</button></div>
+  <form id="paymentMonthForm"><input type="hidden" id="planId">
+    <div class="payment-month-base"><div><span>Pago fijo habitual</span><strong id="planBaseAmount">S/ 0.00</strong></div><div><span>Estado</span><strong id="planState">Pendiente</strong></div></div>
+    <div class="form-grid payment-month-grid"><div><label for="planAmount">Monto de este mes</label><div class="payment-money-input money-entry-shell"><span>S/</span><input id="planAmount" type="text" inputmode="decimal" autocomplete="off" data-money-input required></div></div><div><label for="planDue">Vencimiento de este mes</label><input id="planDue" type="date" required></div></div>
+    <div class="payment-month-paid" id="planPaidInfo" hidden>Ya existe un abono de <strong id="planPaidAmount">S/ 0.00</strong>. El monto mensual no puede quedar por debajo de lo ya pagado.</div>
+    <div class="payment-month-actions-secondary"><button class="btn ghost" type="button" id="planReset">Usar valor fijo</button><button class="btn danger-soft" type="button" id="planSkip">Omitir este mes</button><button class="btn ghost" type="button" id="planRestore" hidden>Restaurar compromiso</button></div>
+    <div class="payment-modal-actions"><button class="btn payment-cancel" type="button" data-plan-close>Cancelar</button><button class="btn primary payment-confirm" id="planSave" type="submit">Guardar solo este mes</button></div>
+  </form>
+</div></div>
 <script>window.FINANCE_FORM_DATA = <?=json_encode($formData, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script src="<?=e(app_url('assets/js/dashboard.js'))?>?v=<?=e((string)@filemtime(__DIR__.'/../assets/js/dashboard.js'))?>"></script>

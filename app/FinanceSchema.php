@@ -2,7 +2,7 @@
 class FinanceSchema {
     public static function ensure(int $userId): void {
         static $done = [];
-        $version='2026-09-02-savings-v6-stable';
+        $version='2026-09-15-smart-monthly-payments-v1';
         if (isset($done[$userId]) || (isset($_SESSION['finance_schema_version']) && $_SESSION['finance_schema_version']===$version)) return;
         $pdo = db();
 
@@ -140,6 +140,38 @@ class FinanceSchema {
         self::addColumnIfMissing('transactions', 'account_id', "INT UNSIGNED DEFAULT NULL AFTER concept_id");
         self::addColumnIfMissing('transactions', 'fund_id', "INT UNSIGNED DEFAULT NULL AFTER account_id");
         self::addColumnIfMissing('recurring_payments', 'fund_id', "INT UNSIGNED DEFAULT NULL AFTER concept_id");
+
+        // Pagos mensuales inteligentes: el monto/fecha del mes puede separarse del
+        // valor recurrente, admite pagos parciales y permite omitir un mes sin
+        // modificar los meses siguientes.
+        if (self::tableExists('monthly_payments')) {
+            self::addColumnIfMissing('monthly_payments', 'paid_amount', "DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER amount");
+            self::addColumnIfMissing('monthly_payments', 'amount_overridden', "TINYINT(1) NOT NULL DEFAULT 0 AFTER paid_amount");
+            self::addColumnIfMissing('monthly_payments', 'due_date_overridden', "TINYINT(1) NOT NULL DEFAULT 0 AFTER amount_overridden");
+            self::addColumnIfMissing('monthly_payments', 'skipped_at', "DATETIME DEFAULT NULL AFTER paid_at");
+            self::addColumnIfMissing('monthly_payments', 'updated_by_user_id', "INT UNSIGNED DEFAULT NULL AFTER skipped_at");
+            self::addColumnIfMissing('monthly_payments', 'updated_at', "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at");
+            self::ensureMonthlyPaymentStatusEnum();
+        }
+
+        $pdo->exec("CREATE TABLE IF NOT EXISTS monthly_payment_parts (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id INT UNSIGNED NOT NULL,
+            monthly_payment_id BIGINT UNSIGNED NOT NULL,
+            transaction_id BIGINT UNSIGNED NOT NULL,
+            amount DECIMAL(12,2) NOT NULL,
+            paid_at DATETIME NOT NULL,
+            created_by_user_id INT UNSIGNED DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY(id),
+            UNIQUE KEY uq_mpp_transaction(transaction_id),
+            KEY idx_mpp_payment(monthly_payment_id),
+            KEY idx_mpp_user_payment(user_id,monthly_payment_id),
+            CONSTRAINT fk_mpp_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+            CONSTRAINT fk_mpp_payment FOREIGN KEY(monthly_payment_id) REFERENCES monthly_payments(id) ON DELETE CASCADE,
+            CONSTRAINT fk_mpp_tx FOREIGN KEY(transaction_id) REFERENCES transactions(id) ON DELETE CASCADE,
+            CONSTRAINT fk_mpp_actor FOREIGN KEY(created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
         if (self::tableExists('recurring_incomes')) {
             self::addColumnIfMissing('recurring_incomes', 'account_id', "INT UNSIGNED DEFAULT NULL AFTER concept_id");
         }
@@ -153,6 +185,32 @@ class FinanceSchema {
         self::addForeignIfMissing('transactions', 'fk_tx_fund', 'FOREIGN KEY (fund_id) REFERENCES funds(id) ON DELETE SET NULL');
         self::addForeignIfMissing('recurring_payments', 'fk_rec_fund', 'FOREIGN KEY (fund_id) REFERENCES funds(id) ON DELETE SET NULL');
         if (self::tableExists('recurring_incomes')) self::addForeignIfMissing('recurring_incomes', 'fk_ri_account', 'FOREIGN KEY (account_id) REFERENCES financial_accounts(id) ON DELETE SET NULL');
+        if (self::tableExists('monthly_payments')) {
+            self::addIndexIfMissing('monthly_payments', 'idx_mp_smart_status', 'user_id,status,due_date');
+            self::addForeignIfMissing('monthly_payments', 'fk_mp_updated_by', 'FOREIGN KEY (updated_by_user_id) REFERENCES users(id) ON DELETE SET NULL');
+
+            // Backfill no destructivo para pagos históricos: un pago que ya estaba
+            // cerrado se considera totalmente cubierto. También registramos su
+            // transacción histórica como una parte para mantener la trazabilidad.
+            $pdo->exec("UPDATE monthly_payments mp
+                LEFT JOIN transactions t ON t.id=mp.transaction_id AND t.user_id=mp.user_id
+                SET mp.paid_amount=CASE
+                    WHEN mp.status='paid' AND mp.paid_amount=0 THEN COALESCE(t.amount,mp.amount)
+                    ELSE mp.paid_amount END
+                WHERE mp.status='paid'");
+            if (self::tableExists('monthly_payment_parts')) {
+                $pdo->exec("INSERT IGNORE INTO monthly_payment_parts
+                    (user_id,monthly_payment_id,transaction_id,amount,paid_at,created_by_user_id,created_at)
+                    SELECT mp.user_id,mp.id,mp.transaction_id,
+                           COALESCE(t.amount,mp.amount),
+                           COALESCE(mp.paid_at,t.occurred_at,mp.created_at),
+                           COALESCE(t.created_by_user_id,t.user_id),
+                           COALESCE(t.created_at,mp.created_at)
+                    FROM monthly_payments mp
+                    JOIN transactions t ON t.id=mp.transaction_id AND t.user_id=mp.user_id
+                    WHERE mp.status='paid' AND mp.transaction_id IS NOT NULL");
+            }
+        }
 
         // v4.1: no modificar fechas ni históricos automáticamente al navegar.
         // Las migraciones de datos deben ejecutarse de forma explícita y con respaldo.
@@ -239,6 +297,20 @@ class FinanceSchema {
         $st->execute([$table,$constraint]);
         if (!$st->fetchColumn()) {
             try { db()->exec("ALTER TABLE `$table` ADD CONSTRAINT `$constraint` $definition"); } catch (Throwable $e) { /* no bloquear despliegue */ }
+        }
+    }
+    private static function ensureMonthlyPaymentStatusEnum(): void {
+        try {
+            $st=db()->prepare("SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='monthly_payments' AND COLUMN_NAME='status' LIMIT 1");
+            $st->execute();
+            $type=(string)($st->fetchColumn() ?: '');
+            if ($type !== '' && (strpos($type,"'partial'")===false || strpos($type,"'skipped'")===false)) {
+                db()->exec("ALTER TABLE monthly_payments MODIFY status ENUM('pending','partial','paid','skipped') NOT NULL DEFAULT 'pending'");
+            }
+        } catch (Throwable $e) {
+            // Si el hosting no permite ALTER, el resto de la aplicación sigue
+            // funcionando con pagos completos. La interfaz reportará el error
+            // al intentar usar una función inteligente.
         }
     }
     private static function ensureDefaultAccount(int $userId): int {

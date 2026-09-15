@@ -4,6 +4,7 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 $uid=require_auth();
 require __DIR__.'/../app/FinanceService.php';
+try { FinanceSchema::ensure($uid); } catch (Throwable $e) { error_log('[finanzas dashboard schema] '.$e->getMessage()); }
 $period=$_GET['period']??date('Y-m');
 
 /**
@@ -13,6 +14,12 @@ $period=$_GET['period']??date('Y-m');
  */
 function ensure_monthly_payments_safe(int $uid, string $period): void {
     if (!preg_match('/^\d{4}-\d{2}$/', $period)) $period = date('Y-m');
+    try {
+        FinanceService::ensureMonthlyPayments($uid,$period);
+        return;
+    } catch (Throwable $smartError) {
+        error_log('[finanzas smart monthly fallback] '.$smartError->getMessage());
+    }
     try {
         [$y,$m] = array_map('intval', explode('-', $period));
         if ($m < 1 || $m > 12 || $y < 2000) return;
@@ -73,7 +80,8 @@ function ensure_monthly_payments_safe(int $uid, string $period): void {
                     $closeDup->execute([$tx['occurred_at'],(int)$tx['id'],$uid,$rid,$period]);
                     continue;
                 }
-                $updatePending->execute([$due,(float)$r['amount'],$uid,$rid,$period]);
+                // En modo compatible no sobrescribimos una fila ya existente:
+                // podría contener una excepción de monto/fecha hecha solo para ese mes.
                 continue;
             }
 
@@ -164,15 +172,32 @@ try {
         $ant->execute([$uid,$start,$end]);
 
         $currentPeriod=date('Y-m');
-        $pendingQ=db()->prepare("SELECT mp.id,mp.period,mp.due_date,mp.amount,mp.status,r.name,r.icon,r.fund_id,DATEDIFF(mp.due_date,CURDATE()) days_left
+        $pendingQ=db()->prepare("SELECT mp.id,mp.period,mp.due_date,mp.amount,mp.paid_amount,
+                GREATEST(mp.amount-mp.paid_amount,0) remaining_amount,mp.status,
+                mp.amount_overridden,mp.due_date_overridden,r.amount recurring_amount,r.due_day recurring_due_day,
+                r.name,r.icon,r.fund_id,DATEDIFF(mp.due_date,CURDATE()) days_left
             FROM monthly_payments mp JOIN recurring_payments r ON r.id=mp.recurring_id
-            WHERE mp.user_id=? AND mp.status='pending' AND mp.period=? ORDER BY mp.due_date ASC");
+            WHERE mp.user_id=? AND mp.status IN ('pending','partial') AND mp.period=?
+              AND mp.amount-mp.paid_amount>0.005 ORDER BY mp.due_date ASC");
         $pendingQ->execute([$uid,$currentPeriod]);$pendingCurrent=$pendingQ->fetchAll();
 
-        $selectedPendingQ=db()->prepare("SELECT mp.id,mp.due_date,mp.amount,mp.status,r.name,r.icon,r.fund_id,DATEDIFF(mp.due_date,CURDATE()) days_left
+        $selectedPendingQ=db()->prepare("SELECT mp.id,mp.period,mp.due_date,mp.amount,mp.paid_amount,
+                GREATEST(mp.amount-mp.paid_amount,0) remaining_amount,mp.status,
+                mp.amount_overridden,mp.due_date_overridden,r.amount recurring_amount,r.due_day recurring_due_day,
+                r.name,r.icon,r.fund_id,DATEDIFF(mp.due_date,CURDATE()) days_left
             FROM monthly_payments mp JOIN recurring_payments r ON r.id=mp.recurring_id
-            WHERE mp.user_id=? AND mp.period=? AND mp.status='pending' ORDER BY mp.due_date ASC");
+            WHERE mp.user_id=? AND mp.period=? AND mp.status IN ('pending','partial')
+              AND mp.amount-mp.paid_amount>0.005 ORDER BY mp.due_date ASC");
         $selectedPendingQ->execute([$uid,$period]);$pending=$selectedPendingQ->fetchAll();
+
+        $paymentsCurrentQ=db()->prepare("SELECT mp.id,mp.period,mp.due_date,mp.amount,mp.paid_amount,
+                GREATEST(mp.amount-mp.paid_amount,0) remaining_amount,mp.status,
+                mp.amount_overridden,mp.due_date_overridden,mp.skipped_at,
+                r.amount recurring_amount,r.due_day recurring_due_day,r.name,r.icon,r.fund_id,
+                DATEDIFF(mp.due_date,CURDATE()) days_left
+            FROM monthly_payments mp JOIN recurring_payments r ON r.id=mp.recurring_id
+            WHERE mp.user_id=? AND mp.period=? ORDER BY mp.due_date,r.id");
+        $paymentsCurrentQ->execute([$uid,$currentPeriod]);$paymentsCurrent=$paymentsCurrentQ->fetchAll();
 
         $recent=db()->prepare("SELECT t.id,t.type,t.amount,t.occurred_at,t.description,t.is_ant_expense,c.name category,c.icon,co.name concept,a.name account,f.name fund,
             u.name actor_name
@@ -189,7 +214,7 @@ try {
         $reserved=0.0;$operationalReserved=0.0;$savingsReserved=0.0;
         foreach($funds as $f){$av=max(0,(float)$f['available']);$reserved+=$av;if(!empty($f['savings_goal_id']))$savingsReserved+=$av;else$operationalReserved+=$av;}
         $unallocated=$totalCash-$reserved;
-        $pendingTotal=0.0;foreach($pendingCurrent as $r)$pendingTotal+=(float)$r['amount'];
+        $pendingTotal=0.0;foreach($pendingCurrent as $r)$pendingTotal+=(float)($r['remaining_amount']??$r['amount']);
 
         // Evitar doble descuento: si un pago pendiente ya está cubierto por su fondo
         // asociado, ese mismo dinero no puede restarse otra vez como deuda descubierta.
@@ -199,7 +224,7 @@ try {
         foreach($pendingCurrent as $pRow){
             if(!empty($pRow['fund_id'])){
                 $fid=(int)$pRow['fund_id'];
-                $dueByFund[$fid]=($dueByFund[$fid]??0)+(float)$pRow['amount'];
+                $dueByFund[$fid]=($dueByFund[$fid]??0)+(float)($pRow['remaining_amount']??$pRow['amount']);
             }
         }
         $fundedCoverage=0.0;
@@ -246,7 +271,7 @@ try {
                 'expected_fixed_income'=>0,'received_fixed_income'=>0,'pending_fixed_income'=>0
             ],
             'accounts'=>$accounts,'funds'=>$funds,'categories'=>$cat->fetchAll(),'daily'=>$daily->fetchAll(),
-            'ant_expenses'=>$ant->fetchAll(),'pending'=>$pending,'pending_current'=>$pendingCurrent,
+            'ant_expenses'=>$ant->fetchAll(),'pending'=>$pending,'pending_current'=>$pendingCurrent,'payments_current'=>$paymentsCurrent,
             'goals_current'=>[],'goals_next'=>[],'fixed_incomes'=>[],'recent'=>$recent->fetchAll(),
             'savings'=>$savingsSafe,'degraded_mode'=>true
         ];

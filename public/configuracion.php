@@ -105,11 +105,26 @@ function cfg_next_occurrence_date(int $day): string {
 
 function cfg_sync_pending_payment_dates(PDO $pdo, int $uid, int $recurringId, float $amount, int $dueDay): void {
     $fromPeriod = date('Y-m');
-    $rows = $pdo->prepare("SELECT id,period FROM monthly_payments WHERE user_id=? AND recurring_id=? AND status='pending' AND period>=? ORDER BY period");
+    $rows = $pdo->prepare("SELECT id,period,paid_amount,amount_overridden,due_date_overridden
+        FROM monthly_payments
+        WHERE user_id=? AND recurring_id=? AND status IN ('pending','partial') AND period>=? ORDER BY period");
     $rows->execute([$uid,$recurringId,$fromPeriod]);
-    $update = $pdo->prepare('UPDATE monthly_payments SET amount=?,due_date=? WHERE id=? AND user_id=?');
+    $update = $pdo->prepare("UPDATE monthly_payments
+        SET amount=?,due_date=?,status=CASE WHEN paid_amount>0 AND paid_amount+0.005>=? THEN 'paid' WHEN paid_amount>0 THEN 'partial' ELSE 'pending' END,
+            paid_at=CASE WHEN paid_amount>0 AND paid_amount+0.005>=? THEN COALESCE(paid_at,NOW()) ELSE NULL END
+        WHERE id=? AND user_id=?");
     foreach ($rows->fetchAll() as $row) {
-        $update->execute([$amount,cfg_date_for_period((string)$row['period'],$dueDay),(int)$row['id'],$uid]);
+        $monthAmount = !empty($row['amount_overridden']) ? null : $amount;
+        $monthDue = !empty($row['due_date_overridden']) ? null : cfg_date_for_period((string)$row['period'],$dueDay);
+        if ($monthAmount === null && $monthDue === null) continue;
+        // Conserva cualquier excepción hecha solo para ese mes.
+        $current=$pdo->prepare('SELECT amount,due_date FROM monthly_payments WHERE id=? AND user_id=? LIMIT 1');
+        $current->execute([(int)$row['id'],$uid]);
+        $cur=$current->fetch();
+        if(!$cur) continue;
+        $effectiveAmount=$monthAmount===null?(float)$cur['amount']:$monthAmount;
+        $effectiveDue=$monthDue===null?(string)$cur['due_date']:$monthDue;
+        $update->execute([$effectiveAmount,$effectiveDue,$effectiveAmount,$effectiveAmount,(int)$row['id'],$uid]);
     }
 }
 
@@ -555,7 +570,7 @@ page_top('Configuración', 'configuracion');
                     <div><span class="settings-kicker">EGRESOS RECURRENTES</span><h2>Pagos fijos</h2><p>Alquiler, mantenimiento, servicios, celulares, colegio y demás compromisos mensuales.</p></div>
                     <div class="settings-head-actions"><div class="settings-head-chip money"><strong>S/ <?=number_format($totalRecurring,2)?></strong><span>referencial / mes</span></div><button type="button" class="settings-new-btn" data-settings-new="payment">Nuevo <b>+</b></button></div>
                 </div>
-                <div class="settings-info-strip success"><span>✓</span><p><strong>Autoguardado activo:</strong> al cambiar nombre, categoría, monto o fecha de vencimiento, el sistema guarda sin botón y actualiza los pagos pendientes todavía no realizados.</p></div>
+                <div class="settings-info-strip success"><span>✓</span><p><strong>Autoguardado activo:</strong> al cambiar nombre, categoría, monto o fecha de vencimiento, el sistema guarda sin botón y actualiza los pagos pendientes todavía no realizados, salvo los meses que hayas ajustado de forma individual.</p></div>
 
                 <div class="settings-card settings-list-card settings-full-list">
                     <div class="settings-card-title"><div><strong>Pagos activos</strong><small>Un solo registro controla concepto, monto referencial, vencimiento y fondo.</small></div><span><?=count($rec)?> activos</span></div>

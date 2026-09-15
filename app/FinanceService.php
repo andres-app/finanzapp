@@ -13,78 +13,95 @@ class FinanceService {
             WHERE user_id=? AND active=1 AND DATE_FORMAT(created_at,'%Y-%m')<=?");
         $st->execute([$userId,$period]);
 
-        $paidRow=db()->prepare("SELECT id,paid_at,transaction_id FROM monthly_payments
-            WHERE user_id=? AND recurring_id=? AND period=? AND status='paid'
+        $existing=db()->prepare("SELECT * FROM monthly_payments
+            WHERE user_id=? AND recurring_id=? AND period=?
             ORDER BY id DESC LIMIT 1");
-        $pendingCount=db()->prepare("SELECT COUNT(*) FROM monthly_payments
-            WHERE user_id=? AND recurring_id=? AND period=? AND status='pending'");
-        $syncPaidDuplicates=db()->prepare("UPDATE monthly_payments
-            SET status='paid',paid_at=?,transaction_id=?
-            WHERE user_id=? AND recurring_id=? AND period=? AND status='pending'");
-        $updatePending=db()->prepare("UPDATE monthly_payments
-            SET due_date=?,amount=?
-            WHERE user_id=? AND recurring_id=? AND period=? AND status='pending'");
-        $findPaymentTx=db()->prepare("SELECT t.id,t.occurred_at FROM transactions t
+        $syncOpen=db()->prepare("UPDATE monthly_payments
+            SET due_date=CASE WHEN due_date_overridden=1 THEN due_date ELSE ? END,
+                amount=CASE WHEN amount_overridden=1 THEN amount ELSE ? END,
+                status=CASE
+                    WHEN status IN ('paid','skipped') THEN status
+                    WHEN paid_amount>0 THEN 'partial'
+                    ELSE 'pending' END
+            WHERE user_id=? AND recurring_id=? AND period=? AND status IN ('pending','partial')");
+        $closeWithLegacyTx=db()->prepare("UPDATE monthly_payments
+            SET status='paid',paid_amount=GREATEST(paid_amount,?),paid_at=?,transaction_id=?
+            WHERE user_id=? AND recurring_id=? AND period=? AND status IN ('pending','partial')");
+        $findPaymentTx=db()->prepare("SELECT t.id,t.occurred_at,t.amount,t.created_by_user_id,t.created_at FROM transactions t
             WHERE t.user_id=? AND t.type='expense' AND t.category_id=? AND t.concept_id=?
               AND t.occurred_at>=? AND t.occurred_at<?
+              AND NOT EXISTS (SELECT 1 FROM monthly_payment_parts part WHERE part.transaction_id=t.id)
               AND NOT EXISTS (
                 SELECT 1 FROM monthly_payments used_mp
                 WHERE used_mp.user_id=t.user_id AND used_mp.transaction_id=t.id AND used_mp.status='paid'
               )
             ORDER BY (t.description=? ) DESC,t.id DESC LIMIT 1");
         $insert=db()->prepare("INSERT INTO monthly_payments
-            (user_id,recurring_id,period,due_date,amount,status,created_at)
-            VALUES(?,?,?,?,?,'pending',NOW())");
+            (user_id,recurring_id,period,due_date,amount,paid_amount,amount_overridden,due_date_overridden,status,created_at)
+            VALUES(?,?,?,?,?,0,0,0,'pending',NOW())");
         $insertPaid=db()->prepare("INSERT INTO monthly_payments
-            (user_id,recurring_id,period,due_date,amount,status,paid_at,transaction_id,created_at)
-            VALUES(?,?,?,?,?,'paid',?,?,NOW())");
+            (user_id,recurring_id,period,due_date,amount,paid_amount,amount_overridden,due_date_overridden,status,paid_at,transaction_id,created_at)
+            VALUES(?,?,?,?,?,?,0,0,'paid',?,?,NOW())");
+        $insertPart=db()->prepare("INSERT IGNORE INTO monthly_payment_parts
+            (user_id,monthly_payment_id,transaction_id,amount,paid_at,created_by_user_id,created_at)
+            VALUES(?,?,?,?,?,?,?)");
 
         foreach ($st->fetchAll() as $r) {
             $day=max(1,min((int)$r['due_day'],$days));
             $due=sprintf('%04d-%02d-%02d',$y,$m,$day);
             $rid=(int)$r['id'];
+            $defaultAmount=(float)$r['amount'];
 
-            // Si existe una fila pagada del mismo compromiso/mes, cualquier duplicado
-            // pendiente es histórico y debe quedar cerrado, nunca recrearse.
-            $paidRow->execute([$userId,$rid,$period]);
-            $paid=$paidRow->fetch();
-            if($paid){
-                $syncPaidDuplicates->execute([$paid['paid_at'],$paid['transaction_id'],$userId,$rid,$period]);
+            $existing->execute([$userId,$rid,$period]);
+            $mp=$existing->fetch();
+
+            if ($mp) {
+                $status=(string)$mp['status'];
+                if ($status==='paid' || $status==='skipped') continue;
+
+                // Los cambios del pago fijo solo actualizan este mes si el usuario
+                // no hizo una excepción explícita de monto o fecha.
+                $syncOpen->execute([$due,$defaultAmount,$userId,$rid,$period]);
+
+                $existing->execute([$userId,$rid,$period]);
+                $mp=$existing->fetch();
+                $paidAmount=(float)($mp['paid_amount'] ?? 0);
+                if ($paidAmount > 0.005) continue;
+
+                // Compatibilidad con versiones anteriores: si existe un egreso de
+                // pago mensual no vinculado, conciliamos una única vez como pagado.
+                $findPaymentTx->execute([
+                    $userId,(int)$r['category_id'],(int)$r['concept_id'],
+                    $periodStart,$periodEnd,'Pago mensual: '.$r['name']
+                ]);
+                $tx=$findPaymentTx->fetch();
+                if($tx){
+                    $txAmount=(float)$tx['amount'];
+                    $closeWithLegacyTx->execute([$txAmount,$tx['occurred_at'],(int)$tx['id'],$userId,$rid,$period]);
+                    $existing->execute([$userId,$rid,$period]);
+                    $closed=$existing->fetch();
+                    if($closed){
+                        $insertPart->execute([$userId,(int)$closed['id'],(int)$tx['id'],$txAmount,$tx['occurred_at'],(int)($tx['created_by_user_id'] ?: $userId),$tx['created_at']]);
+                    }
+                }
                 continue;
             }
 
-            $pendingCount->execute([$userId,$rid,$period]);
-            $hasPending=(int)$pendingCount->fetchColumn()>0;
-
-            // Reparación defensiva: payment_mark crea transacciones con esta descripción
-            // exacta. Si por una versión anterior el egreso se creó pero monthly_payments
-            // no quedó en paid, conciliamos la obligación con esa transacción.
-            // Conciliación defensiva. Primero buscamos por concepto/categoría/período.
-            // La descripción exacta recibe prioridad, pero no es obligatoria porque
-            // versiones anteriores podían haber creado el egreso con descripción vacía.
             $findPaymentTx->execute([
                 $userId,(int)$r['category_id'],(int)$r['concept_id'],
                 $periodStart,$periodEnd,'Pago mensual: '.$r['name']
             ]);
             $tx=$findPaymentTx->fetch();
 
-            if($hasPending){
-                if($tx){
-                    $syncPaidDuplicates->execute([$tx['occurred_at'],(int)$tx['id'],$userId,$rid,$period]);
-                    continue;
-                }
-                $updatePending->execute([$due,(float)$r['amount'],$userId,$rid,$period]);
-                continue;
-            }
-
-            // Si la fila mensual desapareció pero el egreso ya existe, reconstruimos
-            // directamente la obligación como pagada para no revivirla como pendiente.
             if($tx){
-                $insertPaid->execute([$userId,$rid,$period,$due,(float)$r['amount'],$tx['occurred_at'],(int)$tx['id']]);
+                $txAmount=(float)$tx['amount'];
+                $insertPaid->execute([$userId,$rid,$period,$due,$defaultAmount,$txAmount,$tx['occurred_at'],(int)$tx['id']]);
+                $mpId=(int)db()->lastInsertId();
+                $insertPart->execute([$userId,$mpId,(int)$tx['id'],$txAmount,$tx['occurred_at'],(int)($tx['created_by_user_id'] ?: $userId),$tx['created_at']]);
                 continue;
             }
 
-            $insert->execute([$userId,$rid,$period,$due,(float)$r['amount']]);
+            $insert->execute([$userId,$rid,$period,$due,$defaultAmount]);
         }
     }
 
@@ -411,9 +428,19 @@ class FinanceService {
             GROUP BY name,c.icon ORDER BY total DESC LIMIT 6");
         $ant->execute([$userId,$start,$end]);
 
-        $pending = db()->prepare("SELECT mp.id,mp.due_date,mp.amount,mp.status,r.name,r.icon,r.fund_id,DATEDIFF(mp.due_date,CURDATE()) days_left
+        $pending = db()->prepare("SELECT mp.id,mp.period,mp.due_date,mp.amount,mp.paid_amount,
+                GREATEST(mp.amount-mp.paid_amount,0) remaining_amount,mp.status,
+                mp.amount_overridden,mp.due_date_overridden,
+                r.amount recurring_amount,r.due_day recurring_due_day,r.name,r.icon,r.fund_id,
+                DATEDIFF(mp.due_date,CURDATE()) days_left,
+                (SELECT prev.amount FROM monthly_payments prev
+                    WHERE prev.user_id=mp.user_id AND prev.recurring_id=mp.recurring_id
+                      AND prev.period=DATE_FORMAT(DATE_SUB(CONCAT(mp.period,'-01'),INTERVAL 1 MONTH),'%Y-%m')
+                    ORDER BY prev.id DESC LIMIT 1) previous_amount
             FROM monthly_payments mp JOIN recurring_payments r ON r.id=mp.recurring_id
-            WHERE mp.user_id=? AND mp.period=? AND mp.status='pending' ORDER BY mp.due_date ASC");
+            WHERE mp.user_id=? AND mp.period=? AND mp.status IN ('pending','partial')
+              AND mp.amount-mp.paid_amount>0.005
+            ORDER BY mp.due_date ASC");
         $pending->execute([$userId,$period]);
         $pendingRows = $pending->fetchAll();
 
@@ -426,12 +453,37 @@ class FinanceService {
         // obligaciones vencidas de meses anteriores. Un pago impago no desaparece
         // porque cambió el mes.
         $currentMonthEnd = (new DateTimeImmutable($currentPeriod . '-01'))->modify('+1 month')->format('Y-m-d');
-        $pendingNow = db()->prepare("SELECT mp.id,mp.period,mp.due_date,mp.amount,mp.status,r.name,r.icon,r.fund_id,DATEDIFF(mp.due_date,CURDATE()) days_left
+        $pendingNow = db()->prepare("SELECT mp.id,mp.period,mp.due_date,mp.amount,mp.paid_amount,
+                GREATEST(mp.amount-mp.paid_amount,0) remaining_amount,mp.status,
+                mp.amount_overridden,mp.due_date_overridden,
+                r.amount recurring_amount,r.due_day recurring_due_day,r.name,r.icon,r.fund_id,
+                DATEDIFF(mp.due_date,CURDATE()) days_left,
+                (SELECT prev.amount FROM monthly_payments prev
+                    WHERE prev.user_id=mp.user_id AND prev.recurring_id=mp.recurring_id
+                      AND prev.period=DATE_FORMAT(DATE_SUB(CONCAT(mp.period,'-01'),INTERVAL 1 MONTH),'%Y-%m')
+                    ORDER BY prev.id DESC LIMIT 1) previous_amount
             FROM monthly_payments mp JOIN recurring_payments r ON r.id=mp.recurring_id
-            WHERE mp.user_id=? AND mp.status='pending' AND mp.due_date<?
+            WHERE mp.user_id=? AND mp.status IN ('pending','partial') AND mp.due_date<?
+              AND mp.amount-mp.paid_amount>0.005
             ORDER BY mp.due_date ASC");
         $pendingNow->execute([$userId,$currentMonthEnd]);
         $pendingFinancialRows = $pendingNow->fetchAll();
+
+        // Estado completo del mes actual para poder mostrar pagos omitidos, parciales
+        // y excepciones mensuales sin mezclarlos con el total realmente pendiente.
+        $paymentsCurrentSt=db()->prepare("SELECT mp.id,mp.period,mp.due_date,mp.amount,mp.paid_amount,
+                GREATEST(mp.amount-mp.paid_amount,0) remaining_amount,mp.status,
+                mp.amount_overridden,mp.due_date_overridden,mp.skipped_at,
+                r.amount recurring_amount,r.due_day recurring_due_day,r.name,r.icon,r.fund_id,
+                DATEDIFF(mp.due_date,CURDATE()) days_left,
+                (SELECT prev.amount FROM monthly_payments prev
+                    WHERE prev.user_id=mp.user_id AND prev.recurring_id=mp.recurring_id
+                      AND prev.period=DATE_FORMAT(DATE_SUB(CONCAT(mp.period,'-01'),INTERVAL 1 MONTH),'%Y-%m')
+                    ORDER BY prev.id DESC LIMIT 1) previous_amount
+            FROM monthly_payments mp JOIN recurring_payments r ON r.id=mp.recurring_id
+            WHERE mp.user_id=? AND mp.period=? ORDER BY mp.due_date,r.id");
+        $paymentsCurrentSt->execute([$userId,$currentPeriod]);
+        $paymentsCurrent=$paymentsCurrentSt->fetchAll();
 
         $goals = db()->prepare('SELECT id,name,type,target_amount FROM goals WHERE user_id=? AND period=? ORDER BY id');
         $goals->execute([$userId,$period]); $gCur = $goals->fetchAll();
@@ -486,12 +538,12 @@ class FinanceService {
             else $operationalReserved+=$av;
         }
         $unallocated = $totalCash - $reserved;
-        $pendingTotal = array_sum(array_map(function($r){ return (float)$r['amount']; }, $pendingFinancialRows));
+        $pendingTotal = array_sum(array_map(function($r){ return (float)($r['remaining_amount'] ?? $r['amount']); }, $pendingFinancialRows));
 
         $fundAvailableMap=[];
         foreach($funds as $f) $fundAvailableMap[(int)$f['id']] = max(0,(float)$f['available']);
         $dueByFund=[];
-        foreach($pendingFinancialRows as $p) if(!empty($p['fund_id'])) $dueByFund[(int)$p['fund_id']] = ($dueByFund[(int)$p['fund_id']] ?? 0) + (float)$p['amount'];
+        foreach($pendingFinancialRows as $p) if(!empty($p['fund_id'])) $dueByFund[(int)$p['fund_id']] = ($dueByFund[(int)$p['fund_id']] ?? 0) + (float)($p['remaining_amount'] ?? $p['amount']);
         $fundedCoverage=0;
         foreach($dueByFund as $fid=>$due) $fundedCoverage += min($due, $fundAvailableMap[$fid] ?? 0);
         $uncoveredPending=max(0,$pendingTotal-$fundedCoverage);
@@ -531,7 +583,7 @@ class FinanceService {
                 'expected_fixed_income'=>$expectedFixedIncome,'received_fixed_income'=>$receivedFixedIncome,'pending_fixed_income'=>$pendingFixedIncome
             ],
             'accounts'=>$accounts,'funds'=>$funds,'categories'=>$cat->fetchAll(),'daily'=>$daily->fetchAll(),'ant_expenses'=>$ant->fetchAll(),
-            'pending'=>$pendingRows,'pending_current'=>$pendingFinancialRows,'current_period'=>$currentPeriod,
+            'pending'=>$pendingRows,'pending_current'=>$pendingFinancialRows,'payments_current'=>$paymentsCurrent,'current_period'=>$currentPeriod,
             'goals_current'=>$gCur,'goals_next'=>$gNext,'fixed_incomes'=>$fixedIncomeRows,'recent'=>$recent->fetchAll(),
             'savings'=>$savings
         ];
