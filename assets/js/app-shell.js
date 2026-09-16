@@ -214,6 +214,9 @@
 
       const title = doc.querySelector('title')?.textContent?.trim();
       if (title) document.title = title;
+      const incomingHeaderTitle = doc.querySelector('#appHeaderPageTitle')?.textContent?.trim();
+      const currentHeaderTitle = document.getElementById('appHeaderPageTitle');
+      if (currentHeaderTitle && incomingHeaderTitle) currentHeaderTitle.textContent = incomingHeaderTitle;
       updateSidebar(root.dataset.page || '', doc);
 
       await executeScripts(scripts);
@@ -321,6 +324,62 @@
 
   window.MiDinero = api;
   window.MiDineroRegister = register;
+
+  // Registrar global: el selector vive en la cabecera y está disponible en todos los módulos.
+  function closeGlobalRegisterMenus(except = null) {
+    document.querySelectorAll('.global-register-menu.show').forEach(menu => {
+      if (menu === except) return;
+      menu.classList.remove('show');
+      menu.setAttribute('aria-hidden', 'true');
+      const trigger = menu.closest('.global-register-wrap')?.querySelector('[data-global-register-trigger]');
+      trigger?.setAttribute('aria-expanded', 'false');
+    });
+  }
+
+  function toggleGlobalRegisterMenu(trigger) {
+    const wrap = trigger?.closest('.global-register-wrap');
+    const menu = wrap?.querySelector('.global-register-menu');
+    if (!menu) return;
+    const open = !menu.classList.contains('show');
+    closeGlobalRegisterMenus(open ? menu : null);
+    menu.classList.toggle('show', open);
+    menu.setAttribute('aria-hidden', open ? 'false' : 'true');
+    trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
+  document.addEventListener('click', event => {
+    const registerTrigger = event.target.closest('[data-global-register-trigger]');
+    if (registerTrigger) {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleGlobalRegisterMenu(registerTrigger);
+      return;
+    }
+
+    const registerAction = event.target.closest('[data-global-register-action]');
+    if (registerAction) {
+      event.preventDefault();
+      event.stopPropagation();
+      const action = registerAction.dataset.globalRegisterAction || '';
+      closeGlobalRegisterMenus();
+      if (['expense','income','transfer','allocate'].includes(action) && window.APP?.routes?.dashboard) {
+        const target = new URL(APP.routes.dashboard, location.href);
+        target.searchParams.set('action', action);
+        softNavigate(target.href, {push:true});
+      }
+      return;
+    }
+
+    if (event.target.closest('.register-menu-saving')) {
+      closeGlobalRegisterMenus();
+    } else if (!event.target.closest('.global-register-wrap')) {
+      closeGlobalRegisterMenus();
+    }
+  });
+
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeGlobalRegisterMenus();
+  });
 
   document.addEventListener('click', event => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;

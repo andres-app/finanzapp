@@ -40,16 +40,6 @@ page_top('Dashboard','dashboard');
       <label class="date-chip"><input id="period" type="month" value="<?=e($period)?>"><span id="periodLabel"><?=e($periodLabel)?></span><svg viewBox="0 0 24 24"><path d="M7 3v3m10-3v3M4.5 9h15M6 5h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/></svg></label>
       <button class="round-control" id="prevMonth" type="button">‹</button>
       <button class="round-control" id="nextMonth" type="button">›</button>
-      <div class="register-launcher">
-        <button class="btn primary dash-new" id="newTx" type="button" aria-haspopup="menu" aria-expanded="false"><span class="dash-new-icon">+</span><span>Registrar</span></button>
-        <div class="register-menu" id="registerMenu" role="menu" aria-hidden="true">
-          <button type="button" role="menuitem" data-quick-action="expense"><span class="register-menu-icon expense">↓</span><span><b>Gasté</b><small>Registrar un gasto</small></span></button>
-          <button type="button" role="menuitem" data-quick-action="income"><span class="register-menu-icon income">+</span><span><b>Recibí dinero</b><small>Registrar un ingreso</small></span></button>
-          <button type="button" role="menuitem" data-quick-action="transfer"><span class="register-menu-icon transfer">↔</span><span><b>Moví dinero</b><small>Entre tus cuentas</small></span></button>
-          <button type="button" role="menuitem" data-quick-action="allocate"><span class="register-menu-icon allocate">◎</span><span><b>Separé dinero</b><small>Reservar en un fondo</small></span></button>
-          <a class="register-menu-saving" role="menuitem" href="<?=e(app_url('ahorro?action=deposit'))?>"><span class="register-menu-icon saving">◆</span><span><b>Guardar en Ahorro</b><small>Proteger dinero en tu chanchito</small></span></a>
-        </div>
-      </div>
     </div>
   </header>
 
