@@ -1552,3 +1552,21 @@ body:not(.app-navigating) .content {
   .dashboard-minimal-v13,.page-wrap{padding-left:16px!important;padding-right:16px!important}
   .settings-page-v2{padding-left:16px!important;padding-right:16px!important}
 }
+
+/* Planificador: campo de monto estable y legible */
+.planner-form-card .planner-money{
+  position:relative;display:flex;align-items:center;width:100%;height:50px;
+  border:1px solid #dfe3de;border-radius:11px;background:#fff;overflow:hidden;
+  transition:border-color .18s,box-shadow .18s;
+}
+.planner-form-card .planner-money:focus-within{border-color:#a8adb5;box-shadow:0 0 0 4px rgba(17,24,39,.05)}
+.planner-form-card .planner-money>span{
+  position:static;display:block;flex:0 0 auto;padding-left:13px;
+  font-size:13px;font-weight:800;color:#727985;line-height:1;pointer-events:none;
+}
+.planner-form-card .planner-money>input{
+  flex:1;min-width:0;width:100%;height:48px!important;border:0!important;
+  border-radius:0!important;background:transparent!important;box-shadow:none!important;
+  outline:0!important;padding:0 12px 0 8px!important;font-size:16px!important;
+  font-weight:750!important;font-variant-numeric:tabular-nums;color:#111827;
+}
