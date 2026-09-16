@@ -7,7 +7,7 @@ $accountId=max(0,(int)($_GET['account_id']??0));
 $format=strtolower((string)($_GET['format']??'pdf'));
 try{
     $data=StatementExportService::build($uid,$period,$accountId);
-    $ctx=current_household();$owner=(string)($ctx['household_name']??(current_user()['name']??'Mi Dinero'));
+    $ctx=current_household();$owner=(string)($ctx['household_name']??(current_user()['name']??'Finanzapp'));
     $slug=preg_replace('/[^A-Za-z0-9_-]+/','_',iconv('UTF-8','ASCII//TRANSLIT//IGNORE',$data['account_name'])?:'cuentas');
     if($format==='excel'||$format==='xls'){
         $body=StatementExportService::excelXml($data,$owner);

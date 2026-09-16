@@ -110,7 +110,7 @@ class StatementExportService {
             $perPage=$page===1?14:18;$taken=0;
             while($index<count($rows)&&$taken<$perPage){$r=$rows[$index++];self::pdfRow($pdf,$r,$y,$taken%2===1);$y+=18;$taken++;}
             if(!$rows && $page===1){$pdf->text(54,$y+22,'No hay movimientos registrados en este periodo.',10,'',0.35,0.39,0.46);}
-            $pdf->text(54,560,'Generado '.$data['generated_at'].' · Mi Dinero',8,'',0.45,0.48,0.54);
+            $pdf->text(54,560,'Generado '.$data['generated_at'].' · Finanzapp',8,'',0.45,0.48,0.54);
             $pdf->text(744,560,'Pagina '.$page,8,'',0.45,0.48,0.54,'R');
         }while($index<count($rows));
         return $pdf->output();
@@ -118,7 +118,7 @@ class StatementExportService {
 
     private static function pdfHeader(SimpleFinancePdf $pdf,array $d,string $owner,int $page): void {
         $pdf->rect(0,0,842,112,0.055,0.082,0.137,true);
-        $pdf->text(54,40,'MI DINERO',10,'B',0.58,0.98,0.78);
+        $pdf->text(54,40,'FINANZAPP',10,'B',0.58,0.98,0.78);
         $pdf->text(54,66,'Estado de cuenta',25,'B',1,1,1);
         $pdf->text(54,89,$d['account_name'].' · '.$d['period_label'],10,'',0.82,0.85,0.9);
         if($owner!=='')$pdf->text(788,53,$owner,9,'B',0.92,0.94,0.97,'R');
@@ -159,7 +159,7 @@ class StatementExportService {
         $xml.='<Styles><Style ss:ID="Default" ss:Name="Normal"><Alignment ss:Vertical="Center"/><Font ss:FontName="Aptos" ss:Size="10"/></Style><Style ss:ID="Title"><Font ss:Bold="1" ss:Size="18" ss:Color="#111827"/></Style><Style ss:ID="Head"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#111827" ss:Pattern="Solid"/></Style><Style ss:ID="Label"><Font ss:Bold="1" ss:Color="#6B7280"/></Style><Style ss:ID="Money"><NumberFormat ss:Format="&quot;S/ &quot;#,##0.00;[Red]-&quot;S/ &quot;#,##0.00"/></Style><Style ss:ID="MoneyBold"><Font ss:Bold="1"/><NumberFormat ss:Format="&quot;S/ &quot;#,##0.00;[Red]-&quot;S/ &quot;#,##0.00"/></Style><Style ss:ID="Date"><NumberFormat ss:Format="dd/mm/yyyy hh:mm"/></Style><Style ss:ID="Muted"><Font ss:Color="#6B7280"/></Style></Styles>';
         $xml.='<Worksheet ss:Name="Resumen"><Table><Column ss:Width="165"/><Column ss:Width="190"/>';
         $xml.='<Row ss:Height="30"><Cell ss:MergeAcross="1" ss:StyleID="Title"><Data ss:Type="String">Estado de cuenta</Data></Cell></Row>';
-        $summary=[['Periodo',$data['period_label']],['Cuenta',$data['account_name']],['Titular / hogar',$ownerName?:'Mi Dinero'],['Saldo inicial',$data['opening_balance'],'n'],['Entradas',$data['credits'],'n'],['Salidas',$data['debits'],'n'],['Saldo final',$data['closing_balance'],'n'],['Movimientos',$data['movement_count']],['Generado',$data['generated_at']]];
+        $summary=[['Periodo',$data['period_label']],['Cuenta',$data['account_name']],['Titular / hogar',$ownerName?:'Finanzapp'],['Saldo inicial',$data['opening_balance'],'n'],['Entradas',$data['credits'],'n'],['Salidas',$data['debits'],'n'],['Saldo final',$data['closing_balance'],'n'],['Movimientos',$data['movement_count']],['Generado',$data['generated_at']]];
         foreach($summary as $r){$xml.='<Row><Cell ss:StyleID="Label"><Data ss:Type="String">'.$x($r[0]).'</Data></Cell>';if(($r[2]??'')==='n')$xml.='<Cell ss:StyleID="MoneyBold"><Data ss:Type="Number">'.$num($r[1]).'</Data></Cell>';else $xml.='<Cell><Data ss:Type="String">'.$x($r[1]).'</Data></Cell>';$xml.='</Row>';}
         $xml.='</Table></Worksheet>';
         $xml.='<Worksheet ss:Name="Movimientos"><Table><Column ss:Width="105"/><Column ss:Width="135"/><Column ss:Width="125"/><Column ss:Width="290"/><Column ss:Width="90"/><Column ss:Width="90"/><Column ss:Width="95"/>';

@@ -171,7 +171,7 @@ window.MiDineroRegister('configuracion', () => {
           const detail = data?.message || (response.status === 404
             ? `Ruta de guardado no encontrada (${autosaveUrl})`
             : `No se pudo guardar (HTTP ${response.status})`);
-          console.error('[Mi Dinero] Respuesta autoguardado:', {
+          console.error('[Finanzapp] Respuesta autoguardado:', {
             url: autosaveUrl,
             status: response.status,
             body: raw.slice(0, 500)
@@ -189,7 +189,7 @@ window.MiDineroRegister('configuracion', () => {
         failedSnapshot = snapshot;
         const status = form.querySelector('[data-autosave-status]');
         if (status) status.title = message;
-        console.error('[Mi Dinero] Autoguardado:', message);
+        console.error('[Finanzapp] Autoguardado:', message);
         setStatus(form, 'error', 'Error al guardar');
       } finally {
         saving = false;

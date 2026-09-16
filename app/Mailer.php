@@ -9,7 +9,7 @@ class Mailer {
 
         $kind = $tx['type'] === 'income' ? 'Ingreso' : 'Egreso';
         $subject = "{$kind} registrado: S/ " . number_format((float)$tx['amount'], 2);
-        $body = "Se registró un {$kind} en Mi Dinero.\n\n"
+        $body = "Se registró un {$kind} en Finanzapp.\n\n"
               . "Monto: S/ " . number_format((float)$tx['amount'],2) . "\n"
               . "Concepto: " . ($tx['concept_name'] ?: $tx['category_name']) . "\n"
               . "Fecha: " . $tx['occurred_at'] . "\n"
@@ -17,7 +17,7 @@ class Mailer {
         $headers = [
             'MIME-Version: 1.0',
             'Content-Type: text/plain; charset=UTF-8',
-            'From: ' . ($config['mail']['from_name'] ?? 'Mi Dinero') . ' <' . ($config['mail']['from_email'] ?? 'no-reply@localhost') . '>'
+            'From: ' . ($config['mail']['from_name'] ?? 'Finanzapp') . ' <' . ($config['mail']['from_email'] ?? 'no-reply@localhost') . '>'
         ];
         $ok = @mail($to, '=?UTF-8?B?'.base64_encode($subject).'?=', $body, implode("\r\n", $headers));
         try {

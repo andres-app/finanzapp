@@ -66,7 +66,7 @@
       if (typeof instance === 'function') await instance();
       else if (typeof instance.destroy === 'function') await instance.destroy();
     } catch (error) {
-      console.warn('[Mi Dinero] No se pudo limpiar el módulo anterior:', error);
+      console.warn('[Finanzapp] No se pudo limpiar el módulo anterior:', error);
     }
   }
 
@@ -80,7 +80,7 @@
       try {
         currentInstance = (await init({root, app: api})) || null;
       } catch (error) {
-        console.error(`[Mi Dinero] Error iniciando ${currentPage}:`, error);
+        console.error(`[Finanzapp] Error iniciando ${currentPage}:`, error);
       }
     }
     try { window.finBindMoney?.(root); } catch (_) {}
@@ -235,7 +235,7 @@
       return true;
     } catch (error) {
       if (error?.name === 'AbortError') return false;
-      console.error('[Mi Dinero] Navegación dinámica:', error);
+      console.error('[Finanzapp] Navegación dinámica:', error);
       if (!options.noFallback) navigationFallback(target);
       return false;
     } finally {
@@ -276,7 +276,7 @@
         await softRefresh({preserveScroll:true, noFallback:true});
       }
     } catch (error) {
-      console.warn('[Mi Dinero] No se pudo aplicar actualización realtime:', error);
+      console.warn('[Finanzapp] No se pudo aplicar actualización realtime:', error);
     }
   }
 

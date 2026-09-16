@@ -32,9 +32,9 @@ function page_top(string $title, string $active = 'dashboard'): void {
 <body>
 <div class="app-frame">
     <aside class="sidebar" id="sidebar">
-        <a class="side-brand" href="<?=e(app_url('dashboard'))?>" aria-label="Mi Dinero">
+        <a class="side-brand" href="<?=e(app_url('dashboard'))?>" aria-label="Finanzapp">
             <span class="logo-symbol"><i></i><i></i><i></i><i></i></span>
-            <b>mi dinero</b>
+            <b>Finanzapp</b>
         </a>
 
         <nav class="side-nav">
@@ -58,7 +58,7 @@ function page_top(string $title, string $active = 'dashboard'): void {
     <main class="main">
         <header class="mobile-topbar">
             <button class="menu-btn" type="button" aria-label="Abrir menú" onclick="document.body.classList.toggle('menu-open')">☰</button>
-            <a class="mobile-brand" href="<?=e(app_url('dashboard'))?>">mi dinero</a>
+            <a class="mobile-brand" href="<?=e(app_url('dashboard'))?>">Finanzapp</a>
             <button class="mobile-search-trigger" type="button" data-global-search-trigger aria-label="Buscar">⌕</button>
             <button class="mobile-alerts-trigger" type="button" data-global-alerts-trigger aria-label="Alertas">🔔<em data-alerts-badge hidden>0</em></button>
             <div class="global-register-wrap mobile-global-register-wrap">
@@ -75,11 +75,11 @@ function page_top(string $title, string $active = 'dashboard'): void {
         </header>
         <header class="app-topbar" id="appTopbar">
             <div class="app-topbar-context">
-                <span>MI DINERO</span>
+                <span>FINANZAPP</span>
                 <strong id="appHeaderPageTitle"><?=e($title)?></strong>
             </div>
             <div class="app-topbar-actions">
-                <button class="app-header-search" type="button" data-global-search-trigger aria-label="Buscar en Mi Dinero">
+                <button class="app-header-search" type="button" data-global-search-trigger aria-label="Buscar en Finanzapp">
                     <span class="app-header-search-icon">⌕</span><span>Buscar</span><kbd>Ctrl K</kbd>
                 </button>
                 <button class="app-header-alerts" type="button" data-global-alerts-trigger aria-label="Abrir centro de alertas">

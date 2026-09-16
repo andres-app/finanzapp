@@ -46,7 +46,7 @@ page_top('Ahorro','ahorro');
   </section>
 
   <section class="savings-protection-note">
-    <span>🔒</span><div><b>Funciona como un chanchito.</b><small>El dinero sigue en tu cuenta bancaria, pero Mi Dinero lo bloquea para gastos y transferencias normales. Para volver a usarlo debes retirarlo desde Ahorro.</small></div>
+    <span>🔒</span><div><b>Funciona como un chanchito.</b><small>El dinero sigue en tu cuenta bancaria, pero Finanzapp lo bloquea para gastos y transferencias normales. Para volver a usarlo debes retirarlo desde Ahorro.</small></div>
   </section>
 
   <section class="finance-panel savings-vault-card">

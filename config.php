@@ -9,7 +9,7 @@ return [
         'charset' => 'utf8mb4',
     ],
     'app' => [
-        'name' => 'Mi Dinero',
+        'name' => 'Finanzapp',
         'timezone' => 'America/Lima',
         'base_url' => '',
         'session_name' => 'finanzas_rt',
@@ -17,6 +17,6 @@ return [
     'mail' => [
         // El hosting debe tener mail() habilitado. Si usas SMTP, reemplaza app/Mailer.php por PHPMailer.
         'from_email' => 'no-reply@tudominio.com',
-        'from_name' => 'Mi Dinero',
+        'from_name' => 'Finanzapp',
     ],
 ];

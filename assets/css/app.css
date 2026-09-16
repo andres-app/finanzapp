@@ -1519,3 +1519,36 @@ body:not(.app-navigating) .content {
   .mobile-global-register-wrap{display:inline-flex}
   .mobile-global-register-wrap .register-menu{right:12px;left:12px;bottom:68px}
 }
+
+/* ===== Unificación de ancho + marca Finanzapp 2026-09-15 ===== */
+/* Todas las vistas de trabajo usan el ancho disponible del área principal. */
+.main > .content{
+  width:100%;
+  max-width:none;
+}
+.page-wrap,
+.dashboard-minimal-v13,
+.savings-page,
+.savings-v6,
+.savings-v9,
+.settings-page,
+.settings-page-v2{
+  width:100%!important;
+  max-width:none!important;
+  margin-left:0!important;
+  margin-right:0!important;
+  box-sizing:border-box;
+}
+
+/* Mantiene una separación lateral consistente sin volver a centrar la vista. */
+.dashboard-minimal-v13{padding-left:30px;padding-right:30px}
+.page-wrap{padding-left:30px;padding-right:30px}
+.settings-page-v2{padding-left:30px!important;padding-right:30px!important}
+
+/* La marca es ligeramente más legible con el nuevo nombre. */
+.side-brand b,.mobile-brand,.login-brand b{letter-spacing:-.025em}
+
+@media(max-width:760px){
+  .dashboard-minimal-v13,.page-wrap{padding-left:16px!important;padding-right:16px!important}
+  .settings-page-v2{padding-left:16px!important;padding-right:16px!important}
+}

@@ -541,7 +541,7 @@ page_top('Configuración', 'configuracion');
 <div class="settings-page settings-page-v2 settings-page-modals" data-settings-root data-active-tab="<?=e($activeTab)?>" data-autosave-url="<?=e(app_url('api/settings.php'))?>">
     <header class="settings-hero settings-hero-v2">
         <div>
-            <span class="eyebrow">PREFERENCIAS DE MI DINERO</span>
+            <span class="eyebrow">PREFERENCIAS DE FINANZAPP</span>
             <h1>Configuración</h1>
             <p>Administra cada parte del sistema desde una sección independiente.</p>
         </div>

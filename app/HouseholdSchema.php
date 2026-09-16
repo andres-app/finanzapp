@@ -104,7 +104,7 @@ class HouseholdSchema {
         $u = $pdo->prepare('SELECT id,name,email FROM users WHERE LOWER(email)=? LIMIT 1');
         $u->execute([$email]);
         $target = $u->fetch();
-        if (!$target) throw new DomainException('Ese correo todavía no tiene una cuenta en Mi Dinero. Crea primero su usuario y vuelve a intentarlo.');
+        if (!$target) throw new DomainException('Ese correo todavía no tiene una cuenta en Finanzapp. Crea primero su usuario y vuelve a intentarlo.');
         $targetId = (int)$target['id'];
         if ($targetId === $actorUserId) throw new DomainException('Ese usuario ya pertenece a este hogar.');
 

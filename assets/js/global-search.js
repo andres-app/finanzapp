@@ -89,7 +89,7 @@
         render(data.results || []);
       } catch (error) {
         if (error?.name === 'AbortError') return;
-        console.error('[Mi Dinero] Buscador global:', error);
+        console.error('[Finanzapp] Buscador global:', error);
         empty('No se pudo buscar','Recarga una vez la página. Si continúa, revisa que api/search.php haya sido reemplazado.');
       }
     }
