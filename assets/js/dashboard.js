@@ -377,6 +377,10 @@ window.MiDineroRegister('dashboard', () => {
 
   newTx?.addEventListener('click',e=>{e.stopPropagation();toggleRegisterMenu();});
   $$('[data-quick-action]').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();openActionModal(btn.dataset.quickAction);}));
+  window.addEventListener('finanzapp:register-action',e=>{
+    const action=e?.detail?.action||'';
+    if(['expense','income','transfer','allocate'].includes(action))openActionModal(action);
+  },{signal:pageAbort.signal});
   $$('[data-action-close]').forEach(btn=>btn.addEventListener('click',()=>closeActionModal(btn.dataset.actionClose)));
   $$('[data-quick-concept-create]').forEach(btn=>btn.addEventListener('click',()=>openQuickConceptCreator(btn.dataset.quickConceptCreate)));
   $$('[data-quick-concept-close]').forEach(btn=>btn.addEventListener('click',closeQuickConceptCreator));

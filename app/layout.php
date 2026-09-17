@@ -61,16 +61,6 @@ function page_top(string $title, string $active = 'dashboard'): void {
             <a class="mobile-brand" href="<?=e(app_url('dashboard'))?>">Finanzapp</a>
             <button class="mobile-search-trigger" type="button" data-global-search-trigger aria-label="Buscar">⌕</button>
             <button class="mobile-alerts-trigger" type="button" data-global-alerts-trigger aria-label="Alertas">🔔<em data-alerts-badge hidden>0</em></button>
-            <div class="global-register-wrap mobile-global-register-wrap">
-                <button class="mobile-quick-add" type="button" data-global-register-trigger aria-haspopup="menu" aria-expanded="false" aria-label="Registrar">＋</button>
-                <div class="register-menu global-register-menu" role="menu" aria-hidden="true">
-                    <button type="button" role="menuitem" data-global-register-action="expense"><span class="register-menu-icon expense">↓</span><span><b>Gasté</b><small>Registrar un gasto</small></span></button>
-                    <button type="button" role="menuitem" data-global-register-action="income"><span class="register-menu-icon income">+</span><span><b>Recibí dinero</b><small>Registrar un ingreso</small></span></button>
-                    <button type="button" role="menuitem" data-global-register-action="transfer"><span class="register-menu-icon transfer">↔</span><span><b>Moví dinero</b><small>Entre tus cuentas</small></span></button>
-                    <button type="button" role="menuitem" data-global-register-action="allocate"><span class="register-menu-icon allocate">◎</span><span><b>Separé dinero</b><small>Reservar en un fondo</small></span></button>
-                    <a class="register-menu-saving" role="menuitem" href="<?=e(app_url('ahorro?action=deposit'))?>"><span class="register-menu-icon saving">◆</span><span><b>Guardar en Ahorro</b><small>Proteger dinero en tu chanchito</small></span></a>
-                </div>
-            </div>
             <span class="live-dot"><i></i> vivo</span>
         </header>
         <header class="app-topbar" id="appTopbar">
@@ -99,6 +89,7 @@ function page_top(string $title, string $active = 'dashboard'): void {
                 <span class="app-header-avatar" title="<?=e($u['name'] ?? '')?>"><?=e($initials)?></span>
             </div>
         </header>
+
 <?php
     echo '<script>window.APP={csrf:' . json_encode(csrf_token()) . ',apiBase:' . json_encode($apiBase) . ',routes:{dashboard:' . json_encode(app_url('dashboard')) . ',movimientos:' . json_encode(app_url('movimientos')) . ',actividad:' . json_encode(app_url('actividad')) . ',calendario:' . json_encode(app_url('calendario')) . ',planificador:' . json_encode(app_url('planificador')) . ',cierre:' . json_encode(app_url('cierre')) . ',cuentas:' . json_encode(app_url('cuentas')) . ',fondos:' . json_encode(app_url('fondos')) . ',ahorro:' . json_encode(app_url('ahorro')) . ',presupuesto:' . json_encode(app_url('ahorro')) . ',configuracion:' . json_encode(app_url('configuracion')) . '}};</script>';
     echo '<script src="' . e(app_url('assets/js/app-shell.js')) . '?v=' . e((string)@filemtime(__DIR__.'/../assets/js/app-shell.js')) . '"></script>';
@@ -144,6 +135,18 @@ function profile_card(): void {
 function page_bottom(): void { ?>
         </section>
     </main>
+</div>
+<div class="global-register-wrap mobile-register-fab-wrap" aria-label="Acciones rápidas">
+    <button class="mobile-register-fab" type="button" data-global-register-trigger aria-haspopup="menu" aria-expanded="false" aria-label="Registrar movimiento">
+        <span aria-hidden="true">＋</span><b>Registrar</b>
+    </button>
+    <div class="register-menu global-register-menu mobile-register-menu" role="menu" aria-hidden="true">
+        <button type="button" role="menuitem" data-global-register-action="expense"><span class="register-menu-icon expense">↓</span><span><b>Gasté</b><small>Registrar un gasto</small></span></button>
+        <button type="button" role="menuitem" data-global-register-action="income"><span class="register-menu-icon income">+</span><span><b>Recibí dinero</b><small>Registrar un ingreso</small></span></button>
+        <button type="button" role="menuitem" data-global-register-action="transfer"><span class="register-menu-icon transfer">↔</span><span><b>Moví dinero</b><small>Entre tus cuentas</small></span></button>
+        <button type="button" role="menuitem" data-global-register-action="allocate"><span class="register-menu-icon allocate">◎</span><span><b>Separé dinero</b><small>Reservar en un fondo</small></span></button>
+        <a class="register-menu-saving" role="menuitem" href="<?=e(app_url('ahorro?action=deposit'))?>"><span class="register-menu-icon saving">◆</span><span><b>Guardar en Ahorro</b><small>Proteger dinero en tu chanchito</small></span></a>
+    </div>
 </div>
 <div class="mobile-overlay" onclick="document.body.classList.remove('menu-open')"></div>
 </body>

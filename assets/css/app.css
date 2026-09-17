@@ -1577,3 +1577,154 @@ body:not(.app-navigating) .content {
 @media (max-width:980px){.auth-stage{grid-template-columns:1fr}.auth-visual{min-height:330px;padding:28px 34px 42px}.auth-visual-copy{margin:70px 0 25px}.auth-visual-copy h1{font-size:clamp(36px,8vw,58px);max-width:740px}.auth-preview{display:none}.auth-visual-footer{margin-top:auto}.auth-panel{min-height:auto;padding:38px 26px 44px;border-left:0}.auth-panel-inner{width:min(520px,100%)}.auth-mobile-brand{display:none}}
 @media (max-width:640px){.login-2026{background:#f8f9fb}.auth-stage{display:block}.auth-visual{display:none}.auth-panel{min-height:100dvh;padding:24px 20px 28px}.auth-mobile-brand{display:flex;align-items:center;gap:10px;font-size:17px;margin-bottom:70px}.auth-mobile-brand strong{letter-spacing:-.04em}.auth-panel-inner{margin:0 auto}.auth-heading h2{font-size:32px}.auth-heading p{margin-bottom:27px}.auth-input-wrap input{height:56px;font-size:16px}.auth-submit{height:57px}.auth-panel-footer{margin-top:auto;padding-top:42px}.auth-trust{margin-top:22px}}
 @media (prefers-reduced-motion:reduce){.auth-submit,.auth-input-wrap input{transition:none}}
+
+/* ===== Finanzapp · endurecimiento responsive 2026-09-16 ===== */
+/* El registro móvil vive fuera del header para evitar que backdrop-filter/sticky
+   conviertan el menú fixed en un elemento recortado o fuera del viewport. */
+.mobile-register-fab-wrap{display:none}
+
+@media(max-width:760px){
+  html,body{max-width:100%;overflow-x:hidden}
+
+  /* Header móvil: objetivos táctiles reales y mejor distribución. */
+  .mobile-topbar{
+    height:58px;
+    padding:0 10px;
+    gap:4px;
+    z-index:1200;
+  }
+  .menu-btn,
+  .mobile-search-trigger,
+  .mobile-alerts-trigger{
+    flex:0 0 40px;
+    width:40px;
+    height:40px;
+    min-width:40px;
+    min-height:40px;
+    margin:0;
+    padding:0;
+    border:1px solid #e5e7eb;
+    border-radius:11px;
+    background:#fff;
+    display:grid;
+    place-items:center;
+    color:#111827;
+    line-height:1;
+  }
+  .menu-btn{border-color:transparent;background:transparent;font-size:20px}
+  .mobile-search-trigger{margin-left:auto;font-size:20px;transform:none}
+  .mobile-alerts-trigger{font-size:16px}
+  .mobile-alerts-trigger em{right:-2px;top:-3px}
+  .mobile-brand{
+    flex:1 1 auto;
+    min-width:0;
+    margin-left:3px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+
+  /* Acción principal móvil: siempre visible, fácil de pulsar y con etiqueta. */
+  .mobile-register-fab-wrap{
+    display:flex;
+    position:fixed;
+    right:max(14px,env(safe-area-inset-right));
+    bottom:calc(14px + env(safe-area-inset-bottom));
+    z-index:1600;
+    align-items:center;
+    transition:opacity .16s ease,transform .16s ease;
+  }
+  .mobile-register-fab{
+    min-width:132px;
+    height:52px;
+    padding:0 17px 0 14px;
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:16px;
+    background:#111827;
+    color:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    box-shadow:0 14px 34px rgba(15,23,42,.28);
+    font:800 12px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  }
+  .mobile-register-fab>span{font-size:22px;line-height:1;font-weight:500;margin-top:-1px}
+  .mobile-register-fab:active{transform:translateY(1px);box-shadow:0 9px 24px rgba(15,23,42,.24)}
+
+  /* Menú como bottom sheet corto. Queda anclado al viewport, no al header. */
+  .mobile-register-fab-wrap .mobile-register-menu{
+    position:fixed;
+    left:12px;
+    right:12px;
+    top:auto;
+    bottom:calc(78px + env(safe-area-inset-bottom));
+    width:auto;
+    max-width:420px;
+    margin:0 auto;
+    padding:8px;
+    border-radius:18px;
+    z-index:1601;
+    transform-origin:bottom center;
+    box-shadow:0 22px 60px rgba(15,23,42,.24);
+  }
+  .mobile-register-menu>button,
+  .mobile-register-menu>a.register-menu-saving{
+    min-height:58px;
+    padding:9px 10px;
+    border-radius:12px;
+  }
+  .mobile-register-menu>button{grid-template-columns:44px minmax(0,1fr);gap:10px}
+  .mobile-register-menu .register-menu-icon{width:42px;height:42px;border-radius:12px;font-size:18px}
+  .mobile-register-menu b{font-size:13px}
+  .mobile-register-menu small{font-size:10px;line-height:1.35;margin-top:3px}
+
+  /* No dejar el FAB encima de un modal de registro/pago. */
+  body.modal-open .mobile-register-fab-wrap,
+  body.settings-modal-open .mobile-register-fab-wrap{
+    opacity:0;
+    pointer-events:none;
+    transform:translateY(10px);
+  }
+
+  /* Espacio inferior global para que el botón flotante no tape contenido. */
+  .main>.content{
+    min-height:calc(100vh - 58px);
+    padding-bottom:calc(88px + env(safe-area-inset-bottom));
+  }
+
+  /* Los tabs sticky de Configuración ya no quedan debajo del header móvil. */
+  .settings-tabs,.settings-tabs-v2{top:58px!important;z-index:19!important}
+  .settings-section{scroll-margin-top:126px}
+
+  /* Evita el zoom automático de iOS en controles de texto pequeños. */
+  .app-frame .content input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="color"]):not([data-money-input]),
+  .app-frame .content select,
+  .app-frame .content textarea{
+    font-size:16px!important;
+  }
+  .global-search-box input{font-size:16px!important}
+
+  /* Scroll horizontal controlado en componentes que realmente lo necesitan. */
+  .table-wrap,.financial-calendar,.calendar-period-nav,.settings-tabs,.settings-tabs-v2{
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior-inline:contain;
+  }
+
+  /* Feedback y avisos visibles por encima del botón principal. */
+  .calendar-toast,.audit-toast{bottom:calc(82px + env(safe-area-inset-bottom))}
+  .app-feedback-toast{bottom:calc(82px + env(safe-area-inset-bottom))}
+
+  /* Bottom sheets respetan el área segura de iPhone/Android. */
+  .action-modal-card,.expense-modal-card,.income-modal-card,.transfer-modal-card,.allocate-modal-card{
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+}
+
+@media(max-width:390px){
+  .mobile-topbar{padding-left:8px;padding-right:8px;gap:2px}
+  .mobile-brand{font-size:12px}
+  .menu-btn,.mobile-search-trigger,.mobile-alerts-trigger{width:38px;height:38px;min-width:38px;min-height:38px}
+  .mobile-register-fab{height:50px;min-width:126px;border-radius:15px}
+  .mobile-register-fab-wrap .mobile-register-menu{left:9px;right:9px}
+}

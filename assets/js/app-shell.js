@@ -363,9 +363,16 @@
       const action = registerAction.dataset.globalRegisterAction || '';
       closeGlobalRegisterMenus();
       if (['expense','income','transfer','allocate'].includes(action) && window.APP?.routes?.dashboard) {
-        const target = new URL(APP.routes.dashboard, location.href);
-        target.searchParams.set('action', action);
-        softNavigate(target.href, {push:true});
+        // Si ya estamos en el dashboard, abre el modal inmediatamente sin recargar la vista.
+        // En otras pantallas navega al dashboard y conserva la acción en la URL para que
+        // el módulo la procese al inicializarse.
+        if (currentPage === 'dashboard') {
+          window.dispatchEvent(new CustomEvent('finanzapp:register-action', {detail:{action}}));
+        } else {
+          const target = new URL(APP.routes.dashboard, location.href);
+          target.searchParams.set('action', action);
+          softNavigate(target.href, {push:true});
+        }
       }
       return;
     }
