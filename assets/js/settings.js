@@ -232,6 +232,18 @@ window.MiDineroRegister('configuracion', () => {
     });
   });
 
+  // Mantiene únicos los favoritos dentro de cada grupo. Si se elige un concepto
+  // que ya estaba en otra posición, se libera la posición anterior.
+  root.querySelectorAll('[data-quick-access-group]').forEach(group => {
+    group.addEventListener('change', event => {
+      const select = event.target.closest('select');
+      if (!select || !select.value) return;
+      group.querySelectorAll('select').forEach(other => {
+        if (other !== select && other.value === select.value) other.value = '';
+      });
+    });
+  });
+
   const goalType=document.querySelector('#settingsGoalModal select[name="type"]');
   const goalSavingsAccount=document.querySelector('#settingsGoalModal [data-goal-savings-account]');
   function syncGoalSavingsFields(){if(goalSavingsAccount&&goalType)goalSavingsAccount.hidden=goalType.value!=='savings';}

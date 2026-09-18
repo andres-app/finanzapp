@@ -212,6 +212,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             cfg_redirect('Categoría creada correctamente.', 'categorias');
         }
 
+        if ($action === 'quick_access') {
+            $normalizeQuickIds = static function($raw): array {
+                if (!is_array($raw)) $raw = [$raw];
+                $ids = [];
+                foreach ($raw as $value) {
+                    $id = (int)$value;
+                    if ($id > 0 && !in_array($id, $ids, true)) $ids[] = $id;
+                    if (count($ids) >= 5) break;
+                }
+                return $ids;
+            };
+
+            $expenseIds = $normalizeQuickIds($_POST['expense_quick_ids'] ?? []);
+            $incomeIds = $normalizeQuickIds($_POST['income_quick_ids'] ?? []);
+            $requested = array_values(array_unique(array_merge($expenseIds, $incomeIds)));
+
+            $validMap = [];
+            if ($requested) {
+                $marks = implode(',', array_fill(0, count($requested), '?'));
+                $params = array_merge([$uid], $requested);
+                $check = db()->prepare("SELECT co.id,c.type
+                    FROM concepts co
+                    JOIN categories c ON c.id=co.category_id
+                    WHERE co.user_id=? AND co.active=1 AND co.id IN ($marks)");
+                $check->execute($params);
+                foreach ($check->fetchAll() as $row) $validMap[(int)$row['id']] = (string)$row['type'];
+            }
+
+            $expenseIds = array_values(array_filter($expenseIds, fn($id) => ($validMap[$id] ?? '') === 'expense'));
+            $incomeIds = array_values(array_filter($incomeIds, fn($id) => ($validMap[$id] ?? '') === 'income'));
+
+            $pdo = db();
+            $pdo->beginTransaction();
+            try {
+                $before = $pdo->prepare("SELECT co.id,co.name,c.type,co.quick_access_order
+                    FROM concepts co
+                    JOIN categories c ON c.id=co.category_id
+                    WHERE co.user_id=? AND co.active=1 AND co.is_quick_access=1
+                    ORDER BY c.type,co.quick_access_order,co.name");
+                $before->execute([$uid]);
+                $beforeQuick = $before->fetchAll();
+
+                $reset = $pdo->prepare('UPDATE concepts SET is_quick_access=0,quick_access_order=NULL WHERE user_id=?');
+                $reset->execute([$uid]);
+                $mark = $pdo->prepare('UPDATE concepts SET is_quick_access=1,quick_access_order=? WHERE id=? AND user_id=? AND active=1');
+
+                foreach ($expenseIds as $index => $conceptId) $mark->execute([$index + 1, $conceptId, $uid]);
+                foreach ($incomeIds as $index => $conceptId) $mark->execute([$index + 1, $conceptId, $uid]);
+
+                $pdo->commit();
+
+                FinanceAudit::record(
+                    $uid,'quick_access_updated','settings',null,'Accesos rápidos actualizados',
+                    'Se actualizaron los conceptos favoritos del registro rápido.',
+                    $beforeQuick,
+                    ['expense_ids'=>$expenseIds,'income_ids'=>$incomeIds],
+                    null,false
+                );
+                emit_event($uid, 'config_changed', ['quick_access'=>true]);
+                cfg_redirect('Accesos rápidos guardados.', 'conceptos');
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                throw $e;
+            }
+        }
+
         if ($action === 'concept') {
             $categoryId = (int)($_POST['category_id'] ?? 0);
             $name = trim($_POST['name'] ?? '');
@@ -504,6 +570,18 @@ $recConceptIds = [];
 foreach ($rec as $r) if (!empty($r['concept_id'])) $recConceptIds[(int)$r['concept_id']] = true;
 foreach ($incomeRec as $r) if (!empty($r['concept_id'])) $recConceptIds[(int)$r['concept_id']] = true;
 $variableCons = array_values(array_filter($cons, fn($c) => empty($recConceptIds[(int)$c['id']])));
+$expenseCons = array_values(array_filter($cons, fn($c) => ($c['category_type'] ?? '') === 'expense'));
+$incomeCons = array_values(array_filter($cons, fn($c) => ($c['category_type'] ?? '') === 'income'));
+$quickSort = static function(array &$rows): void {
+    usort($rows, static fn($a,$b) =>
+        ((int)($a['quick_access_order'] ?? 99) <=> (int)($b['quick_access_order'] ?? 99))
+        ?: strcasecmp((string)$a['name'], (string)$b['name'])
+    );
+};
+$expenseQuickCons = array_values(array_filter($expenseCons, fn($c) => !empty($c['is_quick_access'])));
+$incomeQuickCons = array_values(array_filter($incomeCons, fn($c) => !empty($c['is_quick_access'])));
+$quickSort($expenseQuickCons);
+$quickSort($incomeQuickCons);
 
 $goalsSt = db()->prepare("SELECT g.*,
     f.id fund_id,NULL account_id,NULL account_name,f.name fund_name
@@ -568,6 +646,32 @@ page_top('Configuración', 'configuracion');
                     <div class="settings-head-actions"><div class="settings-head-chip"><strong><?=count($variableCons)?></strong><span>conceptos</span></div><button type="button" class="settings-new-btn" data-settings-new="concept">Nuevo <b>+</b></button></div>
                 </div>
                 <div class="settings-info-strip"><span>i</span><p>Los <strong>pagos mensuales</strong> se administran en <a href="<?=e(cfg_url('pagos'))?>" data-settings-jump="pagos">Pagos fijos</a> y los <strong>sueldos o rentas recurrentes</strong> en <a href="<?=e(cfg_url('ingresos-fijos'))?>" data-settings-jump="ingresos-fijos">Ingresos fijos</a>. Así no se duplica información.</p></div>
+
+                <div class="settings-card settings-quick-access-card">
+                    <div class="settings-quick-access-head">
+                        <div><span class="settings-kicker">FAVORITOS</span><strong>Accesos rápidos del registro</strong><small>Elige hasta 5 conceptos y ordénalos como quieres verlos encima del selector al registrar un gasto o un ingreso.</small></div>
+                    </div>
+                    <form method="post" class="settings-form settings-quick-access-form" data-autosave>
+                        <input type="hidden" name="csrf" value="<?=e(csrf_token())?>">
+                        <input type="hidden" name="action" value="quick_access">
+                        <input type="hidden" name="return_tab" value="conceptos">
+                        <div class="settings-quick-access-grid">
+                            <div class="settings-quick-access-group" data-quick-access-group>
+                                <div class="settings-quick-access-title"><span>↓</span><div><strong>Gastos favoritos</strong><small>Se muestran en “¿En qué gastaste?”</small></div></div>
+                                <?php for ($i=0; $i<5; $i++): $selected=(int)($expenseQuickCons[$i]['id'] ?? 0); ?>
+                                <label class="settings-quick-slot"><b><?=$i+1?></b><select name="expense_quick_ids[]"><option value="">Sin acceso rápido</option><?php foreach($expenseCons as $c): ?><option value="<?=$c['id']?>" <?=$selected===(int)$c['id']?'selected':''?>><?=e(($c['category_icon'] ?: '•').' '.$c['name'])?></option><?php endforeach; ?></select></label>
+                                <?php endfor; ?>
+                            </div>
+                            <div class="settings-quick-access-group" data-quick-access-group>
+                                <div class="settings-quick-access-title"><span>↑</span><div><strong>Ingresos favoritos</strong><small>Se muestran en “¿Qué dinero recibiste?”</small></div></div>
+                                <?php for ($i=0; $i<5; $i++): $selected=(int)($incomeQuickCons[$i]['id'] ?? 0); ?>
+                                <label class="settings-quick-slot"><b><?=$i+1?></b><select name="income_quick_ids[]"><option value="">Sin acceso rápido</option><?php foreach($incomeCons as $c): ?><option value="<?=$c['id']?>" <?=$selected===(int)$c['id']?'selected':''?>><?=e(($c['category_icon'] ?: '•').' '.$c['name'])?></option><?php endforeach; ?></select></label>
+                                <?php endfor; ?>
+                            </div>
+                        </div>
+                        <span class="autosave-status saved settings-quick-access-save" data-autosave-status><i></i><span>Guardado</span></span>
+                    </form>
+                </div>
 
                 <div class="settings-card settings-list-card settings-full-list">
                     <div class="settings-card-title"><div><strong>Mis conceptos</strong><small>Los cambios se guardan automáticamente mientras editas.</small></div><span>Autoguardado</span></div>

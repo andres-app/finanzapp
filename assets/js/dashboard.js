@@ -288,7 +288,20 @@ window.MiDineroRegister('dashboard', () => {
   function selectRememberedAccount(el){const remembered=localStorage.getItem('fin_last_account');if(remembered&&[...el.options].some(o=>o.value===remembered))el.value=remembered;}
   function fillConceptSelect(el,type,preferred=''){if(!el)return;const rows=conceptsFor(type);const cats=typeCats(type);const prior=preferred||el.value;let html='<option value="" disabled>Selecciona un concepto</option>';if(rows.length)html+=rows.map(c=>{const cat=cats.find(x=>String(x.id)===String(c.category_id));return `<option value="${c.id}" data-category="${c.category_id}" data-amount="${c.default_amount??''}">${esc(cat?.icon||'•')} ${esc(c.name)}</option>`}).join('');else html='<option value="" disabled>No tienes conceptos todavía</option>';el.innerHTML=html;el.disabled=false;if(prior&&rows.some(c=>String(c.id)===String(prior)))el.value=String(prior);else el.value='';}
   function fillCategorySelect(el,type){const rows=typeCats(type);fillSelect(el,rows,c=>`<option value="${c.id}">${esc(c.icon||'•')} ${esc(c.name)}</option>`,type==='income'?'Crea una categoría de ingreso':'Crea una categoría de gasto');}
-  function renderConceptChips(containerId,type,selectId,categoryId,amountFormId){const box=$(containerId),rows=conceptsFor(type).slice(0,5);if(!box)return;box.innerHTML=rows.map(c=>`<button type="button" data-qconcept="${c.id}" data-qtype="${type}">${esc(c.name)}</button>`).join('');box.querySelectorAll('[data-qconcept]').forEach(btn=>btn.onclick=()=>{const sel=$(selectId);sel.value=btn.dataset.qconcept;syncConcept(type,selectId,categoryId,amountFormId);box.querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===btn));});}
+  function quickConceptsFor(type){
+    const all=conceptsFor(type);
+    const hasQuickMetadata=all.some(c=>Object.prototype.hasOwnProperty.call(c,'is_quick_access'));
+    const favorites=all
+      .filter(c=>Number(c.is_quick_access||0)===1)
+      .sort((a,b)=>Number(a.quick_access_order||99)-Number(b.quick_access_order||99)||String(a.name||'').localeCompare(String(b.name||'')))
+      .slice(0,5);
+
+    // Si el servidor ya envía la configuración de favoritos, se respeta exactamente:
+    // incluso cuando el usuario decide dejar todos los accesos rápidos vacíos.
+    // El fallback solo se usa con datos antiguos que aún no contienen estos campos.
+    return hasQuickMetadata ? favorites : all.slice(0,5);
+  }
+  function renderConceptChips(containerId,type,selectId,categoryId,amountFormId){const box=$(containerId),rows=quickConceptsFor(type);if(!box)return;box.innerHTML=rows.map(c=>`<button type="button" data-qconcept="${c.id}" data-qtype="${type}">${esc(c.name)}</button>`).join('');box.hidden=!rows.length;box.querySelectorAll('[data-qconcept]').forEach(btn=>btn.onclick=()=>{const sel=$(selectId);sel.value=btn.dataset.qconcept;syncConcept(type,selectId,categoryId,amountFormId);box.querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===btn));});}
   function renderFundChoices(){const box=$('#fundChoiceGrid');const rows=(config.funds||[]).slice(0,5);box.innerHTML=rows.map(f=>`<button type="button" data-qfund="${f.id}"><span>${esc(f.icon||'💰')}</span><b>${esc(f.name)}</b><small>${money(f.available)} disponible</small></button>`).join('');box.querySelectorAll('[data-qfund]').forEach(btn=>btn.onclick=()=>{$('#allocateFund').value=btn.dataset.qfund;box.querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===btn));});}
   function incomeDefaultForConcept(conceptId){return (config.income_defaults||[]).find(x=>String(x.concept_id)===String(conceptId));}
   function renderIncomeAccountState(manual=false){

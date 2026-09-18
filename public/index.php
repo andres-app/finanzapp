@@ -6,7 +6,7 @@ $period=$_GET['period']??date('Y-m');$u=current_user();$firstName=trim(explode('
 // Datos precargados para que las acciones rápidas funcionen sin esperar AJAX.
 $formCatsSt=db()->prepare('SELECT id,name,type,icon,is_ant_expense FROM categories WHERE user_id=? AND active=1 ORDER BY name');
 $formCatsSt->execute([$uid]);
-$formConceptsSt=db()->prepare('SELECT id,category_id,name,default_amount,is_ant_expense FROM concepts WHERE user_id=? AND active=1 ORDER BY name');
+$formConceptsSt=db()->prepare('SELECT id,category_id,name,default_amount,is_ant_expense,is_quick_access,quick_access_order FROM concepts WHERE user_id=? AND active=1 ORDER BY name');
 $formConceptsSt->execute([$uid]);
 $formAccounts=FinanceService::accountBalances($uid);$formProtected=FinanceService::savingsReservedByAccount($uid,null);
 foreach($formAccounts as &$fa){$fa['savings_reserved']=max(0,(float)($formProtected[(int)$fa['id']]??0));$fa['spendable_balance']=max(0,(float)$fa['balance']-$fa['savings_reserved']);}unset($fa);

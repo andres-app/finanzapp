@@ -2,7 +2,7 @@
 class FinanceSchema {
     public static function ensure(int $userId): void {
         static $done = [];
-        $version='2026-09-15-audit-reversal-month-close-v2';
+        $version='2026-09-18-quick-concepts-v1';
         if (isset($done[$userId]) || (isset($_SESSION['finance_schema_version']) && $_SESSION['finance_schema_version']===$version)) return;
         $pdo = db();
 
@@ -140,6 +140,15 @@ class FinanceSchema {
         self::addColumnIfMissing('transactions', 'account_id', "INT UNSIGNED DEFAULT NULL AFTER concept_id");
         self::addColumnIfMissing('transactions', 'fund_id', "INT UNSIGNED DEFAULT NULL AFTER account_id");
         self::addColumnIfMissing('recurring_payments', 'fund_id', "INT UNSIGNED DEFAULT NULL AFTER concept_id");
+
+        // Accesos rápidos configurables: cada concepto puede marcarse como favorito
+        // y conservar una posición de 1 a 5 dentro de su tipo (gasto o ingreso).
+        if (self::tableExists('concepts')) {
+            self::addColumnIfMissing('concepts', 'is_quick_access', "TINYINT(1) NOT NULL DEFAULT 0 AFTER is_ant_expense");
+            self::addColumnIfMissing('concepts', 'quick_access_order', "TINYINT UNSIGNED DEFAULT NULL AFTER is_quick_access");
+            self::addIndexIfMissing('concepts', 'idx_con_quick', 'user_id,is_quick_access,quick_access_order');
+            self::ensureQuickConceptDefaults($userId);
+        }
 
         // Fase 3: anulación segura. Nada se borra físicamente: las operaciones
         // anuladas quedan visibles para auditoría, pero dejan de afectar saldos.
@@ -402,6 +411,44 @@ class FinanceSchema {
         }
         $ins=$pdo->prepare('INSERT IGNORE INTO finance_migrations(migration_key,applied_at) VALUES(?,NOW())');
         $ins->execute([$key]);
+    }
+
+    private static function ensureQuickConceptDefaults(int $userId): void {
+        $key='2026-09-18-quick-concepts-user-'.$userId;
+        try {
+            $st=db()->prepare('SELECT 1 FROM finance_migrations WHERE migration_key=? LIMIT 1');
+            $st->execute([$key]);
+            if ($st->fetchColumn()) return;
+
+            $pdo=db();
+            $count=$pdo->prepare("SELECT COUNT(*)
+                FROM concepts co
+                JOIN categories c ON c.id=co.category_id
+                WHERE co.user_id=? AND co.active=1 AND c.type=? AND co.is_quick_access=1");
+            $pick=$pdo->prepare("SELECT co.id
+                FROM concepts co
+                JOIN categories c ON c.id=co.category_id
+                WHERE co.user_id=? AND co.active=1 AND c.type=?
+                ORDER BY co.name
+                LIMIT 5");
+            $mark=$pdo->prepare('UPDATE concepts SET is_quick_access=1,quick_access_order=? WHERE id=? AND user_id=?');
+
+            foreach (['expense','income'] as $type) {
+                $count->execute([$userId,$type]);
+                if ((int)$count->fetchColumn() > 0) continue;
+                $pick->execute([$userId,$type]);
+                $order=1;
+                foreach ($pick->fetchAll(PDO::FETCH_COLUMN) as $conceptId) {
+                    $mark->execute([$order++,(int)$conceptId,$userId]);
+                }
+            }
+
+            $done=$pdo->prepare('INSERT IGNORE INTO finance_migrations(migration_key) VALUES(?)');
+            $done->execute([$key]);
+        } catch (Throwable $e) {
+            // Los accesos rápidos no deben impedir el inicio del sistema.
+            error_log('[Finanzapp quick concepts] '.$e->getMessage());
+        }
     }
 
     private static function tableExists(string $table): bool {

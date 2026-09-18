@@ -4,7 +4,7 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 $uid=require_auth();
 FinanceSchema::ensure($uid);
 $cats=db()->prepare('SELECT id,name,type,icon,is_ant_expense FROM categories WHERE user_id=? AND active=1 ORDER BY name');$cats->execute([$uid]);
-$cons=db()->prepare('SELECT id,category_id,name,default_amount,is_ant_expense FROM concepts WHERE user_id=? AND active=1 ORDER BY name');$cons->execute([$uid]);
+$cons=db()->prepare('SELECT id,category_id,name,default_amount,is_ant_expense,is_quick_access,quick_access_order FROM concepts WHERE user_id=? AND active=1 ORDER BY name');$cons->execute([$uid]);
 $accounts=FinanceService::accountBalances($uid);$protected=FinanceService::savingsReservedByAccount($uid,null);
 foreach($accounts as &$a){$a['savings_reserved']=max(0,(float)($protected[(int)$a['id']]??0));$a['spendable_balance']=max(0,(float)$a['balance']-$a['savings_reserved']);}unset($a);
 $incomeDefaults=[];

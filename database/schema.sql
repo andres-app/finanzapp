@@ -37,11 +37,14 @@ CREATE TABLE IF NOT EXISTS concepts (
   name VARCHAR(120) NOT NULL,
   default_amount DECIMAL(12,2) DEFAULT NULL,
   is_ant_expense TINYINT(1) NOT NULL DEFAULT 0,
+  is_quick_access TINYINT(1) NOT NULL DEFAULT 0,
+  quick_access_order TINYINT UNSIGNED DEFAULT NULL,
   active TINYINT(1) NOT NULL DEFAULT 1,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY fk_con_cat (category_id),
   KEY idx_con_user (user_id,category_id,active),
+  KEY idx_con_quick (user_id,is_quick_access,quick_access_order),
   CONSTRAINT fk_con_cat FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE,
   CONSTRAINT fk_con_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
