@@ -31,7 +31,7 @@ page_top('Cuentas', 'cuentas');
     <div>
       <span class="eyebrow">DÓNDE ESTÁ TU DINERO</span>
       <h1>Mis cuentas</h1>
-      <p>Ahora con una vista más visual: cada cuenta se siente como una tarjeta para entender rápido cuánto tienes y cuánto está libre.</p>
+      <p>Revisa cuánto tienes, cuánto está protegido y cuánto puedes usar.</p>
     </div>
     <div class="page-head-actions accounts-head-actions">
       <a class="btn primary" href="<?=e(app_url('dashboard?action=transfer'))?>">↔ Mover dinero</a>
@@ -39,25 +39,20 @@ page_top('Cuentas', 'cuentas');
     </div>
   </div>
 
-  <section class="accounts-overview-grid">
-    <article class="overview-mini-card is-dark">
-      <span>Total en tus cuentas</span>
+  <section class="accounts-overview-clean" aria-label="Resumen de cuentas">
+    <div class="accounts-overview-item primary">
+      <span>Total en cuentas</span>
       <strong>S/ <?=number_format($total,2)?></strong>
-      <small>Lo que hoy figura en tus bancos, billeteras y efectivo.</small>
-    </article>
-    <article class="overview-mini-card">
-      <span>Protegido en ahorro</span>
+    </div>
+    <div class="accounts-overview-item">
+      <span>En ahorro</span>
       <strong>S/ <?=number_format($totalProtected,2)?></strong>
-      <small>Dinero guardado como chanchito y separado de tus gastos.</small>
-    </article>
-    <article class="overview-mini-card is-soft">
-      <span>Disponible real</span>
+    </div>
+    <div class="accounts-overview-item">
+      <span>Disponible</span>
       <strong>S/ <?=number_format($totalSpendable,2)?></strong>
-      <small>Lo que realmente puedes usar hoy antes de tocar el ahorro.</small>
-    </article>
+    </div>
   </section>
-
-  <div class="simple-tip compact-tip"><span>💡</span><div><b>Regla rápida</b><p>Si el dinero pasa entre tus propias cuentas, usa <strong>Mover dinero</strong>. Si solo quieres protegerlo, usa <strong>Guardar en ahorro</strong>.</p></div></div>
 
   <div class="accounts-clean-grid">
     <?php foreach($accounts as $a):
@@ -94,39 +89,22 @@ page_top('Cuentas', 'cuentas');
           <span class="account-debit-brand">Finanzapp</span>
         </div>
         <div class="account-debit-balance">
-          <span>Saldo disponible en esta cuenta</span>
+          <span>Disponible</span>
           <strong>S/ <?=number_format((float)$a['spendable'],2)?></strong>
         </div>
-        <div class="account-debit-bottom">
+        <div class="account-debit-bottom compact">
           <div>
-            <small>Titular</small>
-            <b><?=e($a['name'])?></b>
+            <small>Saldo total</small>
+            <b>S/ <?=number_format((float)$a['balance'],2)?></b>
           </div>
           <div>
+            <small>En ahorro</small>
+            <b>S/ <?=number_format((float)$a['savings_reserved'],2)?></b>
+          </div>
+          <div class="account-number-mini">
             <small>Cuenta</small>
             <b>•••• <?=$suffix?></b>
           </div>
-          <div>
-            <small>Tipo</small>
-            <b><?=e($label)?></b>
-          </div>
-        </div>
-        <span class="account-debit-icon"><?=e($a['icon'])?></span>
-      </div>
-
-      <div class="account-main-balance">
-        <span>Saldo total registrado</span>
-        <strong>S/ <?=number_format((float)$a['balance'],2)?></strong>
-      </div>
-
-      <div class="account-metrics-row">
-        <div class="metric-pill warn">
-          <span>🐷 En ahorro</span>
-          <strong>S/ <?=number_format((float)$a['savings_reserved'],2)?></strong>
-        </div>
-        <div class="metric-pill ok">
-          <span>✨ Dinero libre</span>
-          <strong>S/ <?=number_format((float)$a['spendable'],2)?></strong>
         </div>
       </div>
 
@@ -173,15 +151,6 @@ page_top('Cuentas', 'cuentas');
     </form>
     <?php endforeach; ?>
   </div>
-
-  <section class="simple-action-banner cleaner-banner">
-    <span class="simple-action-banner-icon">↔</span>
-    <div>
-      <h2>Pasa dinero entre tus cuentas sin afectar ingresos ni gastos</h2>
-      <p>Ideal para mover saldo de Interbank a Yape, efectivo o cualquier otra cuenta tuya.</p>
-    </div>
-    <a class="btn primary" href="<?=e(app_url('dashboard?action=transfer'))?>">Mover dinero</a>
-  </section>
 
   <section class="finance-panel form-panel account-create-panel is-hidden" id="addAccountPanel">
     <div class="section-heading">

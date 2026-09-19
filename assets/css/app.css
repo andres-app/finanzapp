@@ -1729,6 +1729,431 @@ body:not(.app-navigating) .content {
   .mobile-register-fab-wrap .mobile-register-menu{left:9px;right:9px}
 }
 
+
+/* Accesos rápidos configurables */
+.settings-quick-access-card{margin:16px 0 18px!important;padding:0!important;overflow:hidden}
+.settings-quick-access-head{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 20px;border-bottom:1px solid var(--line);background:#fdfdfc}
+.settings-quick-access-head strong{display:block;font-size:14px}
+.settings-quick-access-head small{display:block;font-size:10px;color:#959aa2;line-height:1.45;margin-top:4px;max-width:760px}
+.settings-quick-access-form{padding:18px 20px!important}
+.settings-quick-access-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.settings-quick-access-group{display:grid;gap:9px;min-width:0}
+.settings-quick-access-title{display:flex;align-items:center;gap:10px;padding-bottom:4px}
+.settings-quick-access-title>span{width:34px;height:34px;border-radius:10px;background:#f4f4f1;display:grid;place-items:center;font-size:15px}
+.settings-quick-access-title strong{display:block;font-size:11px}
+.settings-quick-access-title small{display:block;font-size:9px;color:#9da1a7;margin-top:2px}
+.settings-quick-slot{display:grid!important;grid-template-columns:28px minmax(0,1fr);align-items:center;gap:8px;margin:0!important}
+.settings-quick-slot>b{width:26px;height:26px;border-radius:8px;background:#f4f4f1;display:grid;place-items:center;font-size:9px;color:#73777d}
+.settings-quick-slot select{width:100%;height:42px!important;border-radius:10px!important;font-size:11px!important}
+.settings-quick-access-save{justify-self:end;margin-top:2px}
+@media(max-width:780px){.settings-quick-access-head{align-items:flex-start;flex-direction:column}.settings-quick-access-grid{grid-template-columns:1fr}.settings-quick-access-save{justify-self:start}}
+
+/* ===== 2026-09-18 · REDISEÑO AMIGABLE CUENTAS + AHORRO ===== */
+.accounts-friendlier-page .overview-mini-card{
+  position:relative;
+  overflow:hidden;
+  border-radius:26px;
+}
+.accounts-friendlier-page .overview-mini-card::after{
+  content:"";
+  position:absolute;
+  inset:auto -40px -40px auto;
+  width:140px;
+  height:140px;
+  border-radius:50%;
+  background:radial-gradient(circle, rgba(255,255,255,.22), transparent 68%);
+  pointer-events:none;
+}
+.account-debit-card{
+  position:relative;
+  overflow:hidden;
+}
+.account-debit-visual{
+  position:relative;
+  overflow:hidden;
+  border-radius:24px;
+  padding:18px 18px 16px;
+  min-height:190px;
+  color:#fff;
+  background:
+    radial-gradient(circle at top right, rgba(255,255,255,.26), transparent 28%),
+    radial-gradient(circle at bottom left, rgba(255,255,255,.18), transparent 24%),
+    linear-gradient(135deg, color-mix(in srgb, var(--account-accent, #111827) 88%, white 0%), color-mix(in srgb, var(--account-accent, #111827) 58%, #111827 42%));
+  box-shadow:0 16px 36px rgba(15,23,42,.16);
+}
+.account-debit-visual::before,
+.account-debit-visual::after{
+  content:"";
+  position:absolute;
+  border-radius:999px;
+  background:rgba(255,255,255,.11);
+  pointer-events:none;
+}
+.account-debit-visual::before{width:170px;height:170px;right:-60px;top:-70px}
+.account-debit-visual::after{width:140px;height:140px;left:-55px;bottom:-78px}
+.account-debit-topline{
+  position:relative;
+  z-index:1;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+}
+.account-debit-chip{
+  width:42px;
+  height:30px;
+  border-radius:8px;
+  background:linear-gradient(135deg, rgba(251,191,36,.95), rgba(245,158,11,.74));
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.15);
+  position:relative;
+}
+.account-debit-chip::before,
+.account-debit-chip::after{
+  content:"";
+  position:absolute;
+  top:5px;
+  bottom:5px;
+  width:1px;
+  background:rgba(120,74,0,.35);
+}
+.account-debit-chip::before{left:13px}
+.account-debit-chip::after{left:24px}
+.account-debit-brand{
+  font-size:12px;
+  letter-spacing:.14em;
+  font-weight:800;
+  text-transform:uppercase;
+  color:rgba(255,255,255,.92);
+}
+.account-debit-balance{
+  position:relative;
+  z-index:1;
+  margin-top:28px;
+}
+.account-debit-balance span{
+  display:block;
+  font-size:12px;
+  color:rgba(255,255,255,.72);
+  margin-bottom:8px;
+}
+.account-debit-balance strong{
+  display:block;
+  font-size:34px;
+  line-height:1;
+  letter-spacing:-.05em;
+  color:#fff;
+}
+.account-debit-bottom{
+  position:relative;
+  z-index:1;
+  margin-top:30px;
+  display:grid;
+  grid-template-columns:1.2fr .8fr .9fr;
+  gap:12px;
+}
+.account-debit-bottom small{
+  display:block;
+  font-size:9px;
+  text-transform:uppercase;
+  letter-spacing:.14em;
+  color:rgba(255,255,255,.62);
+  margin-bottom:4px;
+}
+.account-debit-bottom b{
+  display:block;
+  font-size:12px;
+  line-height:1.35;
+  color:#fff;
+}
+.account-debit-icon{
+  position:absolute;
+  right:18px;
+  bottom:16px;
+  width:42px;
+  height:42px;
+  border-radius:14px;
+  background:rgba(255,255,255,.14);
+  display:grid;
+  place-items:center;
+  font-size:22px;
+  z-index:1;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);
+}
+.account-clean-card .account-main-balance{
+  margin-top:2px;
+  padding:0 2px;
+}
+.account-clean-card .account-main-balance span{
+  font-size:11px;
+  margin-bottom:4px;
+}
+.account-clean-card .account-main-balance strong{
+  font-size:26px;
+}
+.account-debit-card .metric-pill.warn{
+  background:#fff7ee;
+  border-color:#f6e2c4;
+}
+.account-debit-card .metric-pill.ok{
+  background:#f2faf5;
+  border-color:#dcefe1;
+}
+.account-debit-card .account-actions-row .btn{
+  border-radius:14px;
+}
+.account-debit-card .account-actions-row .btn.secondary,
+.account-debit-card .account-actions-row .btn.ghost{
+  background:#fff;
+}
+@media (max-width: 640px){
+  .account-debit-visual{min-height:176px;padding:16px}
+  .account-debit-balance strong{font-size:30px}
+  .account-debit-bottom{grid-template-columns:1fr 1fr;gap:10px;margin-top:22px}
+  .account-debit-bottom>div:last-child{grid-column:1/-1}
+  .account-clean-card .account-main-balance strong{font-size:24px}
+}
+
+.piggy-page{
+  gap:20px;
+}
+.piggy-hero-card{
+  position:relative;
+  overflow:hidden;
+  display:grid;
+  grid-template-columns:minmax(0,1.4fr) minmax(280px,.9fr);
+  gap:18px;
+  padding:24px;
+  border-radius:30px;
+  background:linear-gradient(135deg, #fff5f6 0%, #fff1eb 52%, #fff9f0 100%);
+  border:1px solid #f6dfde;
+  box-shadow:0 18px 40px rgba(244,114,182,.08);
+}
+.piggy-hero-card::before,
+.piggy-hero-card::after{
+  content:"";
+  position:absolute;
+  border-radius:50%;
+  pointer-events:none;
+  background:rgba(244,114,182,.09);
+}
+.piggy-hero-card::before{width:220px;height:220px;top:-90px;right:-70px}
+.piggy-hero-card::after{width:170px;height:170px;bottom:-85px;left:-60px}
+.piggy-hero-copy,
+.piggy-hero-aside{position:relative;z-index:1}
+.piggy-hero-tag{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:7px 12px;
+  border-radius:999px;
+  background:#fff;
+  color:#b45373;
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.12em;
+}
+.piggy-hero-card h2{
+  margin:14px 0 10px;
+  font-size:34px;
+  line-height:1.02;
+  letter-spacing:-.04em;
+  color:#2f2430;
+}
+.piggy-hero-card p{
+  margin:0;
+  max-width:640px;
+  color:#7b6673;
+  font-size:14px;
+  line-height:1.55;
+}
+.piggy-hero-balance{
+  margin-top:20px;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+.piggy-hero-balance article,
+.piggy-hero-stack div{
+  background:rgba(255,255,255,.78);
+  border:1px solid rgba(246,223,222,.9);
+  border-radius:20px;
+  padding:14px 16px;
+}
+.piggy-hero-balance small,
+.piggy-hero-stack span{
+  display:block;
+  font-size:11px;
+  color:#8d7180;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  font-weight:700;
+  margin-bottom:6px;
+}
+.piggy-hero-balance strong,
+.piggy-hero-stack b{
+  display:block;
+  font-size:28px;
+  line-height:1;
+  color:#2f2430;
+  letter-spacing:-.04em;
+}
+.piggy-hero-aside{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:14px;
+}
+.piggy-hero-emoji{
+  width:132px;
+  height:132px;
+  border-radius:36px;
+  background:linear-gradient(180deg, #ffd7e3 0%, #ffc4d6 100%);
+  display:grid;
+  place-items:center;
+  font-size:68px;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.6), 0 16px 30px rgba(244,114,182,.15);
+}
+.piggy-hero-stack{
+  width:100%;
+  display:grid;
+  gap:10px;
+}
+.piggy-summary-grid{
+  grid-template-columns:1.4fr repeat(3,1fr);
+}
+.piggy-summary-grid article{
+  border-radius:22px;
+  border:1px solid #f0e5e3;
+  background:#fff;
+  box-shadow:0 10px 24px rgba(17,24,39,.035);
+}
+.piggy-summary-grid article.primary{
+  background:linear-gradient(135deg, #2e1f34 0%, #503043 100%);
+  border-color:#2e1f34;
+}
+.piggy-summary-grid article:not(.primary){
+  background:linear-gradient(180deg, #fff 0%, #fff9f8 100%);
+}
+.piggy-protection-note{
+  background:#fff7f8;
+  border:1px solid #f4dfe4;
+}
+.piggy-vault-card{
+  border-radius:24px;
+  border:1px solid #f0e3e5;
+  background:linear-gradient(180deg, #fff 0%, #fff9f8 100%);
+  box-shadow:0 12px 26px rgba(17,24,39,.04);
+}
+.piggy-vault-card .section-heading{
+  margin-bottom:14px;
+}
+.piggy-vault-accounts{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:12px;
+}
+.piggy-vault-accounts .empty{
+  grid-column:1/-1;
+}
+.savings-vault-account{
+  border-radius:18px;
+  border:1px solid #f2e4e7;
+  background:#fff;
+  padding:14px 15px;
+  display:grid;
+  grid-template-columns:44px minmax(0,1fr) auto;
+  gap:12px;
+  align-items:center;
+}
+.savings-vault-account>span{
+  width:44px;
+  height:44px;
+  border-radius:14px;
+  display:grid;
+  place-items:center;
+  background:#fff4f6;
+  font-size:22px;
+}
+.savings-vault-account b{font-size:14px;color:#2b2330}
+.savings-vault-account small{display:block;margin-top:3px;color:#8d7a84;font-size:11px}
+.savings-vault-account strong{font-size:15px;color:#2b2330;white-space:nowrap}
+.piggy-general-card,
+.piggy-goal-card,
+.piggy-history-panel{
+  border-color:#f0e1e4;
+  box-shadow:0 12px 28px rgba(17,24,39,.04);
+}
+.piggy-general-card{
+  background:linear-gradient(135deg, #fff5f6 0%, #fffaf2 100%);
+  border-radius:22px;
+}
+.piggy-general-card .savings-goal-icon,
+.piggy-goal-card .savings-goal-icon{
+  background:#ffe6ee;
+  box-shadow:inset 0 0 0 1px rgba(244,114,182,.16);
+}
+.piggy-goal-card{
+  position:relative;
+  overflow:hidden;
+  border-radius:24px;
+  background:linear-gradient(180deg, #fff 0%, #fff9fb 100%);
+}
+.piggy-goal-card::after{
+  content:"🐾";
+  position:absolute;
+  right:18px;
+  top:16px;
+  font-size:22px;
+  opacity:.08;
+  transform:rotate(-8deg);
+}
+.piggy-goal-card .savings-goal-top h3,
+.piggy-general-card h3{
+  color:#2f2430;
+}
+.piggy-goal-card .savings-goal-amount strong{
+  color:#2f2430;
+}
+.piggy-goal-card .savings-progress{
+  background:#f6ebee;
+  height:10px;
+}
+.piggy-goal-card .savings-where-v6{
+  background:#fff4f7;
+  border:1px solid #f7e4ea;
+}
+.piggy-goal-card .savings-goal-actions .btn,
+.piggy-general-card .savings-goal-actions .btn{
+  border-radius:14px;
+}
+.piggy-history-panel{
+  border-radius:22px;
+}
+.piggy-history-panel .savings-history-row{
+  padding:14px 0;
+}
+@media (max-width: 1040px){
+  .piggy-hero-card{grid-template-columns:1fr}
+  .piggy-hero-aside{align-items:stretch}
+  .piggy-hero-emoji{margin:0 auto}
+  .piggy-summary-grid{grid-template-columns:1fr 1fr}
+  .piggy-summary-grid .primary{grid-column:1/-1}
+}
+@media (max-width: 700px){
+  .piggy-hero-card{padding:18px;border-radius:24px}
+  .piggy-hero-card h2{font-size:28px}
+  .piggy-hero-balance{grid-template-columns:1fr}
+  .piggy-hero-balance strong,
+  .piggy-hero-stack b{font-size:24px}
+  .piggy-hero-emoji{width:110px;height:110px;font-size:56px;border-radius:30px}
+  .piggy-summary-grid{grid-template-columns:1fr}
+  .piggy-summary-grid .primary{grid-column:auto}
+  .piggy-vault-accounts{grid-template-columns:1fr}
+  .savings-vault-account{grid-template-columns:44px 1fr;align-items:start}
+  .savings-vault-account strong{grid-column:2}
+}
+
 /* ===== Sidebar UX · iconos genuinos + colapsable desktop ===== */
 :root{--sidebar-collapsed:88px}
 .sidebar{transition:width .22s ease,padding .22s ease,box-shadow .22s ease}
@@ -1825,4 +2250,199 @@ body.sidebar-collapsed .side-nav a.active::after{content:"";position:absolute;le
   .planner-form-card .planner-money{min-height:58px;padding:0 14px}
   .planner-form-card .planner-money>span{font-size:21px}
   .planner-form-card .planner-money input{min-height:54px;height:54px;font-size:24px!important}
+}
+
+/* ===== Cuentas · modo limpio / menos ruido visual ===== */
+.accounts-friendlier-page{
+  gap:16px;
+}
+.accounts-friendlier-page .accounts-clean-head{
+  margin-bottom:4px;
+}
+.accounts-friendlier-page .accounts-clean-head p{
+  max-width:620px;
+  color:#8a919c;
+}
+.accounts-overview-clean{
+  display:grid;
+  grid-template-columns:1.35fr 1fr 1fr;
+  border:1px solid #e9ecef;
+  border-radius:18px;
+  background:#fff;
+  overflow:hidden;
+  margin:4px 0 14px;
+}
+.accounts-overview-item{
+  min-width:0;
+  padding:16px 20px;
+  border-left:1px solid #edf0f2;
+}
+.accounts-overview-item:first-child{border-left:0}
+.accounts-overview-item span{
+  display:block;
+  margin-bottom:5px;
+  color:#8b929d;
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.accounts-overview-item strong{
+  display:block;
+  color:#111827;
+  font-size:23px;
+  line-height:1.05;
+  letter-spacing:-.035em;
+}
+.accounts-overview-item.primary{
+  background:#f8f9fa;
+}
+.accounts-overview-item.primary strong{
+  font-size:27px;
+}
+.accounts-friendlier-page .accounts-clean-grid{
+  gap:12px;
+}
+.accounts-friendlier-page .account-clean-card{
+  gap:10px;
+  padding:14px;
+  border:1px solid #e8ebee;
+  border-radius:18px;
+  box-shadow:none;
+  background:#fff;
+}
+.accounts-friendlier-page .account-clean-top{
+  align-items:center;
+}
+.accounts-friendlier-page .account-clean-icon{
+  width:36px;
+  height:36px;
+  border-radius:11px;
+  background:#f5f6f7;
+  font-size:17px;
+}
+.accounts-friendlier-page .account-clean-identity h3{
+  font-size:14px;
+  letter-spacing:-.015em;
+}
+.accounts-friendlier-page .account-clean-identity p{
+  font-size:9px;
+  color:#969ca6;
+}
+.accounts-friendlier-page .autosave-status{
+  font-size:7px;
+  color:#9aa0aa;
+}
+.accounts-friendlier-page .account-clean-menu summary{
+  width:30px;
+  height:30px;
+  border-radius:9px;
+  font-size:17px;
+}
+.accounts-friendlier-page .account-debit-visual{
+  min-height:150px;
+  padding:15px 16px 14px;
+  border-radius:17px;
+  color:#111827;
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--account-accent,#111827) 7%, #ffffff 93%) 0%,
+      #ffffff 72%);
+  border:1px solid color-mix(in srgb, var(--account-accent,#111827) 16%, #e5e7eb 84%);
+  box-shadow:none;
+}
+.accounts-friendlier-page .account-debit-visual::before{
+  content:"";
+  position:absolute;
+  left:0;
+  right:0;
+  top:0;
+  width:auto;
+  height:4px;
+  border-radius:17px 17px 0 0;
+  background:var(--account-accent,#111827);
+  opacity:.78;
+}
+.accounts-friendlier-page .account-debit-visual::after{display:none}
+.accounts-friendlier-page .account-debit-chip{
+  width:34px;
+  height:24px;
+  border-radius:7px;
+  background:#e9d8a6;
+  box-shadow:inset 0 0 0 1px rgba(17,24,39,.08);
+}
+.accounts-friendlier-page .account-debit-brand{
+  color:#8d939c;
+  font-size:9px;
+  letter-spacing:.13em;
+}
+.accounts-friendlier-page .account-debit-balance{
+  margin-top:20px;
+}
+.accounts-friendlier-page .account-debit-balance span{
+  margin-bottom:4px;
+  color:#8a919c;
+  font-size:10px;
+}
+.accounts-friendlier-page .account-debit-balance strong{
+  color:#111827;
+  font-size:29px;
+}
+.accounts-friendlier-page .account-debit-bottom.compact{
+  grid-template-columns:1fr 1fr auto;
+  align-items:end;
+  gap:12px;
+  margin-top:20px;
+}
+.accounts-friendlier-page .account-debit-bottom.compact small{
+  color:#9aa0a9;
+  font-size:7px;
+  letter-spacing:.09em;
+}
+.accounts-friendlier-page .account-debit-bottom.compact b{
+  color:#343a45;
+  font-size:10px;
+  font-weight:750;
+}
+.accounts-friendlier-page .account-number-mini{
+  text-align:right;
+}
+.accounts-friendlier-page .account-actions-row{
+  gap:7px;
+}
+.accounts-friendlier-page .account-actions-row .btn{
+  min-height:34px;
+  padding:7px 9px;
+  border-radius:10px;
+  border:1px solid #e8ebee;
+  background:#fff;
+  color:#313844;
+  font-size:9px;
+  font-weight:700;
+  box-shadow:none;
+}
+.accounts-friendlier-page .account-actions-row .btn:hover{
+  background:#f7f8f9;
+}
+.accounts-friendlier-page .account-edit-box{
+  padding-top:8px;
+  border-top:1px solid #f0f1f2;
+}
+.accounts-friendlier-page .account-edit-box summary{
+  color:#7b838f;
+  font-size:9px;
+  font-weight:650;
+}
+@media(max-width:900px){
+  .accounts-overview-clean{grid-template-columns:1fr 1fr 1fr}
+  .accounts-overview-item{padding:14px 15px}
+}
+@media(max-width:650px){
+  .accounts-overview-clean{grid-template-columns:1fr}
+  .accounts-overview-item{border-left:0;border-top:1px solid #edf0f2;padding:13px 15px}
+  .accounts-overview-item:first-child{border-top:0}
+  .accounts-overview-item.primary strong{font-size:25px}
+  .accounts-friendlier-page .account-debit-visual{min-height:145px}
+  .accounts-friendlier-page .account-debit-bottom.compact{grid-template-columns:1fr 1fr}
+  .accounts-friendlier-page .account-number-mini{grid-column:1/-1;text-align:left}
 }
