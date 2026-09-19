@@ -156,7 +156,7 @@ page_top('Planificador de compras','planificador');
       <span class="planner-step">SIMULACIÓN</span><h2>¿Qué estás pensando comprar?</h2>
       <form id="purchasePlannerForm">
         <label>Compra o gasto<input id="plannerName" type="text" placeholder="Ej. TV, sofá, viaje, celular…" autocomplete="off"></label>
-        <label>Monto<div class="money-input planner-money"><span>S/</span><input id="plannerAmount" type="text" inputmode="decimal" placeholder="0.00" autocomplete="off"></div></label>
+        <label>Monto<div class="payment-money-input money-entry-shell planner-money"><span>S/</span><input id="plannerAmount" type="text" inputmode="decimal" placeholder="0.00" autocomplete="off" data-money-input></div></label>
         <label>¿De qué cuenta saldría?<select id="plannerAccount"><option value="0">Cualquiera · ver saldo total</option><?php foreach($accounts as $a):?><option value="<?=$a['id']?>" data-spendable="<?=e((string)$a['spendable_balance'])?>" data-balance="<?=e((string)$a['balance'])?>" data-name="<?=e($a['name'])?>"><?=e(($a['icon']?:'🏦').' '.$a['name'])?> · S/ <?=number_format((float)$a['spendable_balance'],2)?></option><?php endforeach;?></select></label>
         <label class="planner-check"><input id="plannerIncludePending" type="checkbox" checked><span><b>Considerar pagos pendientes</b><small>También calcular cuánto quedaría después de pagar tus compromisos actuales.</small></span></label>
         <button class="btn primary planner-calc" type="submit">Calcular impacto</button>

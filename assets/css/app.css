@@ -1776,3 +1776,53 @@ body.sidebar-collapsed .side-nav a.active::after{content:"";position:absolute;le
   body.sidebar-collapsed .side-help a{justify-content:flex-start;padding-left:11px;padding-right:11px}
   body.sidebar-collapsed .side-collapse-btn{position:static}
 }
+
+/* ===== Fix planificador: campo de monto visible y consistente ===== */
+.planner-form-card .planner-money{
+  display:flex;
+  align-items:center;
+  min-height:62px;
+  padding:0 16px;
+  border:1px solid #dfe1dd;
+  border-radius:15px;
+  background:#fff;
+  transition:border-color .18s,box-shadow .18s;
+}
+.planner-form-card .planner-money:focus-within{
+  border-color:#a8adb5;
+  box-shadow:0 0 0 4px rgba(17,24,39,.05);
+}
+.planner-form-card .planner-money>span{
+  position:static;
+  transform:none;
+  flex:0 0 auto;
+  margin-right:10px;
+  font-size:24px;
+  font-weight:800;
+  line-height:1;
+  color:#6b7280;
+  pointer-events:none;
+}
+.planner-form-card .planner-money input{
+  border:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  outline:none;
+  width:100%;
+  min-height:58px;
+  height:58px;
+  padding:0!important;
+  font-size:30px!important;
+  font-weight:800;
+  line-height:1.1;
+  letter-spacing:-.03em;
+  color:#111827;
+}
+.planner-form-card .planner-money input::placeholder{
+  color:#b2b7bf;
+}
+@media(max-width:640px){
+  .planner-form-card .planner-money{min-height:58px;padding:0 14px}
+  .planner-form-card .planner-money>span{font-size:21px}
+  .planner-form-card .planner-money input{min-height:54px;height:54px;font-size:24px!important}
+}
