@@ -3,10 +3,26 @@ $config = require __DIR__ . '/../config.php';
 date_default_timezone_set($config['app']['timezone'] ?? 'America/Lima');
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_name($config['app']['session_name'] ?? 'finanzas_rt');
-    ini_set('session.cookie_httponly','1');
-    ini_set('session.cookie_samesite','Lax');
-    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
-    if ($https) ini_set('session.cookie_secure','1');
+
+    // La sesión local también usa una cookie persistente. Si el hosting elimina
+    // el archivo de sesión, AuthPersistence la reconstruye con un token seguro.
+    $sessionTtl = 315360000; // 10 años; se elimina expresamente al cerrar sesión.
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+
+    ini_set('session.use_strict_mode', '1');
+    ini_set('session.cookie_httponly', '1');
+    ini_set('session.cookie_samesite', 'Lax');
+    ini_set('session.gc_maxlifetime', (string)$sessionTtl);
+
+    session_set_cookie_params([
+        'lifetime' => $sessionTtl,
+        'path' => '/',
+        'secure' => $https,
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
+
     session_start();
 }
 
@@ -147,3 +163,29 @@ function user_initials(?string $name): string {
     $last = count($parts) > 1 ? mb_substr($parts[count($parts)-1], 0, 1) : '';
     return mb_strtoupper($first . $last);
 }
+
+// En la ruta de cierre de sesión no se debe restaurar ni renovar el acceso
+// persistente. Así evitamos que el mismo request de /logout vuelva a autenticar
+// al usuario antes de que logout.php elimine las cookies y el token persistente.
+$requestPath = (string)(parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '');
+$isLogoutRequest = (bool)preg_match('~/(?:public/)?logout(?:\.php)?/?$~i', $requestPath);
+
+if (!$isLogoutRequest) {
+    // Si PHP perdió la sesión del servidor pero el navegador conserva el acceso
+    // persistente, se reconstruye automáticamente sin pedir usuario/contraseña.
+    if (empty($_SESSION['user_id'])) {
+        try {
+            AuthPersistence::restore();
+        } catch (Throwable $e) {
+            error_log('Finanzapp persistent auth bootstrap: ' . $e->getMessage());
+        }
+    } else {
+        // Mantiene renovada la cookie de sesión mientras el usuario use la app.
+        try {
+            AuthPersistence::refreshSessionCookie();
+        } catch (Throwable $e) {
+            // No interrumpir la aplicación por un problema al renovar la cookie.
+        }
+    }
+}
+

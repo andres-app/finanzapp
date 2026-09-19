@@ -1,15 +1,18 @@
 <?php
 function nav_svg(string $name): string {
     $icons = [
-        'dashboard' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-13h6V4h-6v3Z"/></svg>',
-        'movimientos' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h13M17 4l3 3-3 3M17 17H4m3-3-3 3 3 3"/></svg>',
-        'actividad' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-2.05-4.95L14 10h7V3l-2.63 2.63A8.96 8.96 0 0 0 12 3Zm-1 4h2v5.2l3.3 2-1 1.7L11 13.3V7Z"/></svg>',
-        'calendario' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2v3m10-3v3M4 9h16M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Zm2 9h3v3H7v-3Zm5 0h3v3h-3v-3Z"/></svg>',
-        'planificador' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v18H5V3Zm3 3h8v3H8V6Zm0 6h2v2H8v-2Zm4 0h4v2h-4v-2Zm-4 4h2v2H8v-2Zm4 0h4v2h-4v-2Z"/></svg>',
-        'cuentas' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5 12 3l9 4.5V10H3V7.5ZM5 12h2v6H5v-6Zm6 0h2v6h-2v-6Zm6 0h2v6h-2v-6ZM3 20h18"/></svg>',
-        'fondos' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2Zm2 0V7a5 5 0 0 1 10 0v2m-5 4v3"/></svg>',
-        'ahorro' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c4.4 0 8 2.7 8 6.1 0 2.1-1.2 4-3.2 5.1V19h-3v-2.2c-.6.1-1.2.2-1.8.2s-1.2-.1-1.8-.2V19h-3v-4.8C5.2 13.1 4 11.2 4 9.1 4 5.7 7.6 3 12 3Zm-2.5 5.2h5M17.8 7H20v3"/></svg>',
-        'configuracion' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5ZM19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.37a1.7 1.7 0 0 0-1 .63 1.7 1.7 0 0 0-.4 1v.1H9.6V21a1.7 1.7 0 0 0-.4-1 1.7 1.7 0 0 0-1-.63 1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 3.83 15a1.7 1.7 0 0 0-.63-1 1.7 1.7 0 0 0-1-.4h-.1V9.6h.1a1.7 1.7 0 0 0 1-.4 1.7 1.7 0 0 0 .63-1 1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 8.2 3.83a1.7 1.7 0 0 0 1-.63 1.7 1.7 0 0 0 .4-1v-.1h4v.1a1.7 1.7 0 0 0 .4 1 1.7 1.7 0 0 0 1 .63 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.37 8.2c.12.38.34.72.63 1 .28.23.63.37 1 .4h.1v4h-.1a1.7 1.7 0 0 0-1 .4c-.29.28-.51.62-.63 1Z"/></svg>',
+        'dashboard' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.75 7.5A2.25 2.25 0 0 1 6 5.25h3A2.25 2.25 0 0 1 11.25 7.5v3A2.25 2.25 0 0 1 9 12.75H6A2.25 2.25 0 0 1 3.75 10.5v-3Zm9 0A2.25 2.25 0 0 1 15 5.25h3A2.25 2.25 0 0 1 20.25 7.5v7A2.25 2.25 0 0 1 18 16.75h-3a2.25 2.25 0 0 1-2.25-2.25v-7Zm-9 9A2.25 2.25 0 0 1 6 14.25h3a2.25 2.25 0 0 1 2.25 2.25v1.5A2.25 2.25 0 0 1 9 20.25H6A2.25 2.25 0 0 1 3.75 18v-1.5Zm9 1.5A2.25 2.25 0 0 1 15 15.75h3A2.25 2.25 0 0 1 20.25 18v.75A1.5 1.5 0 0 1 18.75 20.25h-4.5a1.5 1.5 0 0 1-1.5-1.5V18Z"/></svg>',
+        'movimientos' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 7.5h12m0 0-3-3m3 3-3 3M19.5 16.5h-12m0 0 3-3m-3 3 3 3"/></svg>',
+        'actividad' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v6l3.75 2.25M21 12a9 9 0 1 1-2.64-6.36"/></svg>',
+        'calendario' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.25 3.75v3m7.5-3v3m-11.25 3h15m-15.75 7.5V6.75A2.25 2.25 0 0 1 6 4.5h12a2.25 2.25 0 0 1 2.25 2.25v11.25A2.25 2.25 0 0 1 18 20.25H6A2.25 2.25 0 0 1 3.75 18Zm4.5-3.75h3v3h-3v-3Z"/></svg>',
+        'planificador' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.75 4.5h10.5A2.25 2.25 0 0 1 19.5 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 17.25V6.75A2.25 2.25 0 0 1 6.75 4.5Zm2.25 3.75h6m-6 4.5h6m-6 4.5h3"/></svg>',
+        'cuentas' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.75 9 12 4.5 20.25 9M5.25 9.75v8.25m4.5-8.25v8.25m4.5-8.25v8.25m4.5-8.25v8.25M3.75 19.5h16.5"/></svg>',
+        'fondos' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7.5V6.75a6 6 0 1 1 12 0v.75m-12 0h12A2.25 2.25 0 0 1 20.25 9.75v8.25A2.25 2.25 0 0 1 18 20.25H6A2.25 2.25 0 0 1 3.75 18V9.75A2.25 2.25 0 0 1 6 7.5Zm6 4.5v3"/></svg>',
+        'ahorro' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 9.75h4.125m1.875 0h.75m-6.375 6h6.375m-3-12c4.556 0 8.25 2.798 8.25 6.25 0 1.814-1.02 3.448-2.644 4.59l.394 2.16h-3.112l-.175-.7A10.62 10.62 0 0 1 12 16.25c-.68 0-1.345-.064-1.986-.185l-.176.685H6.726l.395-2.16C5.498 13.448 4.5 11.814 4.5 10c0-3.452 3.694-6.25 8.25-6.25Z"/></svg>',
+        'configuracion' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37 1 .608 2.296.07 2.572-1.065ZM12 15.75A3.75 3.75 0 1 0 12 8.25a3.75 3.75 0 0 0 0 7.5Z"/></svg>',
+        'help' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 18h.008v.008H12V18Zm0-2.25c0-2.25 3-2.625 3-5.25a3 3 0 0 0-6 0"/><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"/></svg>',
+        'logout' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.75 8.25 19.5 12l-3.75 3.75M19.5 12H9.75m4.5-7.5h-6A2.25 2.25 0 0 0 6 6.75v10.5a2.25 2.25 0 0 0 2.25 2.25h6"/></svg>',
+        'collapse' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6 9 12l6 6"/></svg>',
     ];
     return $icons[$name] ?? '';
 }
@@ -28,30 +31,44 @@ function page_top(string $title, string $active = 'dashboard'): void {
     <meta name="theme-color" content="#f5f5f3">
     <title><?=e($title)?> · <?=e($config['app']['name'])?></title>
     <link rel="stylesheet" href="<?=e(app_url('assets/css/app.css'))?>?v=<?=e((string)@filemtime(__DIR__.'/../assets/css/app.css'))?>">
+    <style>
+      .side-logout-form{margin:0;padding:0}
+      .side-logout-button{width:100%;min-height:42px;padding:0 8px;border:0;background:transparent;color:#67707e;font:inherit;font-size:12px;font-weight:600;display:flex;align-items:center;gap:11px;border-radius:12px;cursor:pointer;text-align:left}
+      .side-logout-button:hover{background:#f7f8fa;color:#111827}
+      body.sidebar-collapsed .side-logout-button{justify-content:center;padding-left:0;padding-right:0}
+      @media(max-width:760px){body.sidebar-collapsed .side-logout-button{justify-content:flex-start;padding-left:8px;padding-right:8px}}
+    </style>
 </head>
 <body>
 <div class="app-frame">
     <aside class="sidebar" id="sidebar">
-        <a class="side-brand" href="<?=e(app_url('dashboard'))?>" aria-label="Finanzapp">
-            <span class="logo-symbol"><i></i><i></i><i></i><i></i></span>
-            <b>Finanzapp</b>
-        </a>
+        <div class="side-brand-row">
+            <a class="side-brand" href="<?=e(app_url('dashboard'))?>" aria-label="Finanzapp" title="Finanzapp">
+                <span class="logo-symbol"><i></i><i></i><i></i><i></i></span>
+                <b>Finanzapp</b>
+            </a>
+            <button class="side-collapse-btn" type="button" data-sidebar-toggle aria-label="Colapsar menú" aria-expanded="true" title="Colapsar menú">
+                <?=nav_svg('collapse')?>
+            </button>
+        </div>
 
-        <nav class="side-nav">
-            <a class="<?=$active==='dashboard'?'active':''?>" href="<?=e(app_url('dashboard'))?>"><?=nav_svg('dashboard')?><span>Dashboard</span></a>
-            <a class="<?=$active==='movimientos'?'active':''?>" href="<?=e(app_url('movimientos'))?>"><?=nav_svg('movimientos')?><span>Movimientos</span></a>
-            <a class="<?=$active==='actividad'?'active':''?>" href="<?=e(app_url('actividad'))?>"><?=nav_svg('actividad')?><span>Actividad</span></a>
-            <a class="<?=$active==='calendario'?'active':''?>" href="<?=e(app_url('calendario'))?>"><?=nav_svg('calendario')?><span>Calendario</span></a>
-            <a class="<?=$active==='planificador'?'active':''?>" href="<?=e(app_url('planificador'))?>"><?=nav_svg('planificador')?><span>Planificador</span></a>
-            <a class="<?=$active==='cuentas'?'active':''?>" href="<?=e(app_url('cuentas'))?>"><?=nav_svg('cuentas')?><span>Cuentas</span></a>
-            <a class="<?=$active==='fondos'?'active':''?>" href="<?=e(app_url('fondos'))?>"><?=nav_svg('fondos')?><span>Fondos</span></a>
-            <a class="<?=$active==='ahorro'?'active':''?>" href="<?=e(app_url('ahorro'))?>"><?=nav_svg('ahorro')?><span>Ahorro</span></a>
-            <a class="<?=$active==='configuracion'?'active':''?>" href="<?=e(app_url('configuracion'))?>"><?=nav_svg('configuracion')?><span>Configuración</span></a>
+        <nav class="side-nav" aria-label="Navegación principal">
+            <a class="<?=$active==='dashboard'?'active':''?>" href="<?=e(app_url('dashboard'))?>" title="Dashboard"><span class="nav-ico"><?=nav_svg('dashboard')?></span><span class="nav-label">Dashboard</span></a>
+            <a class="<?=$active==='movimientos'?'active':''?>" href="<?=e(app_url('movimientos'))?>" title="Movimientos"><span class="nav-ico"><?=nav_svg('movimientos')?></span><span class="nav-label">Movimientos</span></a>
+            <a class="<?=$active==='actividad'?'active':''?>" href="<?=e(app_url('actividad'))?>" title="Actividad"><span class="nav-ico"><?=nav_svg('actividad')?></span><span class="nav-label">Actividad</span></a>
+            <a class="<?=$active==='calendario'?'active':''?>" href="<?=e(app_url('calendario'))?>" title="Calendario"><span class="nav-ico"><?=nav_svg('calendario')?></span><span class="nav-label">Calendario</span></a>
+            <a class="<?=$active==='planificador'?'active':''?>" href="<?=e(app_url('planificador'))?>" title="Planificador"><span class="nav-ico"><?=nav_svg('planificador')?></span><span class="nav-label">Planificador</span></a>
+            <a class="<?=$active==='cuentas'?'active':''?>" href="<?=e(app_url('cuentas'))?>" title="Cuentas"><span class="nav-ico"><?=nav_svg('cuentas')?></span><span class="nav-label">Cuentas</span></a>
+            <a class="<?=$active==='fondos'?'active':''?>" href="<?=e(app_url('fondos'))?>" title="Fondos"><span class="nav-ico"><?=nav_svg('fondos')?></span><span class="nav-label">Fondos</span></a>
+            <a class="<?=$active==='ahorro'?'active':''?>" href="<?=e(app_url('ahorro'))?>" title="Ahorro"><span class="nav-ico"><?=nav_svg('ahorro')?></span><span class="nav-label">Ahorro</span></a>
+            <a class="<?=$active==='configuracion'?'active':''?>" href="<?=e(app_url('configuracion'))?>" title="Configuración"><span class="nav-ico"><?=nav_svg('configuracion')?></span><span class="nav-label">Configuración</span></a>
         </nav>
 
         <div class="side-help">
-            <a href="<?=e(app_url('configuracion'))?>"><span class="circle-icon">?</span> Ayuda y configuración</a>
-            <a href="<?=e(app_url('logout'))?>"><span class="circle-icon">−</span> Cerrar sesión</a>
+            <a href="<?=e(app_url('configuracion'))?>" title="Ayuda y configuración"><span class="circle-icon"><?=nav_svg('help')?></span><span class="side-help-label">Ayuda y configuración</span></a>
+            <form method="post" action="<?=e(app_url('logout'))?>" class="side-logout-form" data-hard-logout>
+                <button type="submit" class="side-logout-button" title="Cerrar sesión" aria-label="Cerrar sesión"><span class="circle-icon"><?=nav_svg('logout')?></span><span class="side-help-label">Cerrar sesión</span></button>
+            </form>
         </div>
     </aside>
 

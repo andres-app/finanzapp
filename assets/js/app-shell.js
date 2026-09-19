@@ -11,6 +11,8 @@
   let realtimeTimer = null;
   let pendingRealtimeEvents = [];
   let initialized = false;
+  const SIDEBAR_KEY = "finanzapp:sidebar-collapsed";
+  const MOBILE_BREAKPOINT = 760;
 
   const makeClientId = () =>
     (window.crypto?.randomUUID?.() || `md-${Date.now()}-${Math.random().toString(36).slice(2)}`).slice(0, 80);
@@ -322,6 +324,39 @@
     get currentPage() { return currentPage; }
   };
 
+  function isDesktopSidebarViewport() {
+    return window.innerWidth > MOBILE_BREAKPOINT;
+  }
+
+  function readSidebarPreference() {
+    try { return localStorage.getItem(SIDEBAR_KEY) === "1"; } catch (_) { return false; }
+  }
+
+  function writeSidebarPreference(collapsed) {
+    try { localStorage.setItem(SIDEBAR_KEY, collapsed ? "1" : "0"); } catch (_) {}
+  }
+
+  function applySidebarState(collapsed) {
+    const enabled = !!collapsed && isDesktopSidebarViewport();
+    document.body.classList.toggle("sidebar-collapsed", enabled);
+    document.querySelectorAll("[data-sidebar-toggle]").forEach(btn => {
+      btn.setAttribute("aria-expanded", enabled ? "false" : "true");
+      btn.setAttribute("aria-label", enabled ? "Expandir menú" : "Colapsar menú");
+      btn.setAttribute("title", enabled ? "Expandir menú" : "Colapsar menú");
+    });
+  }
+
+  function syncSidebarState() {
+    if (isDesktopSidebarViewport()) applySidebarState(readSidebarPreference());
+    else document.body.classList.remove("sidebar-collapsed");
+  }
+
+  function toggleSidebar(force) {
+    const next = typeof force === "boolean" ? force : !document.body.classList.contains("sidebar-collapsed");
+    writeSidebarPreference(next);
+    applySidebarState(next);
+  }
+
   window.MiDinero = api;
   window.MiDineroRegister = register;
 
@@ -348,6 +383,14 @@
   }
 
   document.addEventListener('click', event => {
+    const sidebarToggle = event.target.closest("[data-sidebar-toggle]");
+    if (sidebarToggle) {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleSidebar();
+      return;
+    }
+
     const registerTrigger = event.target.closest('[data-global-register-trigger]');
     if (registerTrigger) {
       event.preventDefault();
@@ -413,6 +456,7 @@
   });
 
   window.addEventListener('beforeunload', closeRealtime);
+  window.addEventListener('resize', syncSidebarState);
   document.addEventListener('focusout', () => {
     if (pendingRealtimeEvents.length) {
       clearTimeout(realtimeTimer);
@@ -425,6 +469,7 @@
     initialized = true;
     markExistingScripts();
     currentUrl = location.href;
+    syncSidebarState();
     await initCurrent();
     connectRealtime();
   };
