@@ -16,42 +16,75 @@ try {
 }
 if(!$moduleError){
     try{$history=FinanceService::savingsHistory($uid,40);}catch(Throwable $e){$historyError='El historial no pudo cargarse temporalmente.';error_log('[MiDinero ahorro page v9 history] '.$e->getMessage());}
-    try{
-        // Usa la misma disponibilidad libre que el Dashboard para asignaciones:
-        // efectivo - fondos/ahorro ya reservados. Los pagos pendientes no se descuentan.
-        $dashFree=FinanceService::dashboard($uid,date('Y-m'));
-        $free=max(0,(float)($dashFree['summary']['free_to_spend']??0));
-    } catch(Throwable $e){
-        try{$free=max(0,FinanceService::freeToSpendNow($uid));}
-        catch(Throwable $e2){try{$free=max(0,FinanceService::totalCash($uid)-FinanceService::totalReserved($uid));}catch(Throwable $ignored){$free=0;}}
-        error_log('[MiDinero ahorro page v17 free] '.$e->getMessage());
-    }
+    try{$free=max(0,FinanceService::availableFreeCash($uid));}catch(Throwable $e){$free=0;error_log('[MiDinero ahorro page v9 free] '.$e->getMessage());}
 }
 page_top('Ahorro','ahorro');
 ?>
-<div class="page-wrap savings-page savings-v9">
+<div class="page-wrap savings-page savings-v9 piggy-page">
   <div class="page-head savings-page-head">
-    <div><span class="eyebrow">TU CHANCHITO DIGITAL</span><h1>Ahorro</h1><p>Protege dinero para que no se mezcle con lo que puedes gastar.</p></div>
+    <div><span class="eyebrow">TU CHANCHITO DIGITAL</span><h1>Ahorro</h1><p>Protege dinero para que no se mezcle con lo que puedes gastar y míralo de forma más cálida y fácil de entender.</p></div>
     <?php if(!$moduleError):?><button type="button" class="btn primary savings-main-action" id="openSavingsDeposit">＋ Guardar en ahorro</button><?php endif;?>
   </div>
 
   <?php if($moduleError):?>
     <section class="savings-error-card"><b>No se pudo cargar el ahorro.</b><p><?=e($moduleError)?> Abre <code>/api/savings_health.php</code> para revisar el diagnóstico.</p></section>
   <?php else:?>
-  <section class="savings-summary-v6 savings-summary-v9">
-    <article class="primary"><span>AHORRO PROTEGIDO</span><strong>S/ <?=number_format((float)$savings['total_saved'],2)?></strong><small>No se puede usar en gastos hasta que lo retires.</small></article>
-    <article><span>Con meta</span><strong>S/ <?=number_format((float)$savings['assigned_to_goals'],2)?></strong><small>Asignado a tus objetivos.</small></article>
-    <article><span>Sin meta</span><strong>S/ <?=number_format((float)$savings['general_saved'],2)?></strong><small>Ahorro general protegido.</small></article>
-    <article><span>Disponible para ahorrar</span><strong>S/ <?=number_format(max(0,$free),2)?></strong><small>Dinero no asignado a fondos ni ahorro.</small></article>
+
+  <section class="piggy-hero-card">
+    <div class="piggy-hero-copy">
+      <span class="piggy-hero-tag">🐷 CHANCHITO DIGITAL</span>
+      <h2>Tus guardaditos viven aquí</h2>
+      <p>Lo que guardas sigue dentro de tus cuentas, pero Finanzapp lo separa para que no lo gastes por error. Puedes ahorrarlo sin meta o repartirlo en metas.</p>
+      <div class="piggy-hero-balance">
+        <article>
+          <small>Protegido ahora</small>
+          <strong>S/ <?=number_format((float)$savings['total_saved'],2)?></strong>
+        </article>
+        <article>
+          <small>Libre para ahorrar</small>
+          <strong>S/ <?=number_format(max(0,$free),2)?></strong>
+        </article>
+      </div>
+    </div>
+    <div class="piggy-hero-aside">
+      <div class="piggy-hero-emoji">🐷</div>
+      <div class="piggy-hero-stack">
+        <div><span>Con meta</span><b>S/ <?=number_format((float)$savings['assigned_to_goals'],2)?></b></div>
+        <div><span>Sin meta</span><b>S/ <?=number_format((float)$savings['general_saved'],2)?></b></div>
+      </div>
+    </div>
   </section>
 
-  <section class="savings-protection-note">
+  <section class="savings-summary-v6 savings-summary-v9 piggy-summary-grid">
+    <article class="primary">
+      <span>AHORRO PROTEGIDO</span>
+      <strong>S/ <?=number_format((float)$savings['total_saved'],2)?></strong>
+      <small>No se puede usar en gastos hasta que lo retires del chanchito.</small>
+    </article>
+    <article>
+      <span>Con meta</span>
+      <strong>S/ <?=number_format((float)$savings['assigned_to_goals'],2)?></strong>
+      <small>Separado para objetivos concretos.</small>
+    </article>
+    <article>
+      <span>Sin meta</span>
+      <strong>S/ <?=number_format((float)$savings['general_saved'],2)?></strong>
+      <small>Guardadito general, listo para crecer.</small>
+    </article>
+    <article>
+      <span>Disponible para ahorrar</span>
+      <strong>S/ <?=number_format(max(0,$free),2)?></strong>
+      <small>Dinero que hoy puedes mandar al chanchito.</small>
+    </article>
+  </section>
+
+  <section class="savings-protection-note piggy-protection-note">
     <span>🔒</span><div><b>Funciona como un chanchito.</b><small>El dinero sigue en tu cuenta bancaria, pero Finanzapp lo bloquea para gastos y transferencias normales. Para volver a usarlo debes retirarlo desde Ahorro.</small></div>
   </section>
 
-  <section class="finance-panel savings-vault-card">
-    <div class="section-heading"><div><span class="eyebrow">FONDO AHORRO</span><h2>¿Dónde está guardado?</h2><p>Una sola bolsa de ahorro, distribuida entre tus cuentas reales.</p></div><button type="button" class="btn" id="openSavingsDepositInline">＋ Guardar</button></div>
-    <div class="savings-vault-accounts">
+  <section class="finance-panel savings-vault-card piggy-vault-card">
+    <div class="section-heading"><div><span class="eyebrow">FONDO AHORRO</span><h2>¿Dónde duerme tu chanchito?</h2><p>Una sola bolsa de ahorro, distribuida entre tus cuentas reales.</p></div><button type="button" class="btn" id="openSavingsDepositInline">＋ Guardar</button></div>
+    <div class="savings-vault-accounts piggy-vault-accounts">
       <?php if(empty($savings['account_breakdown'])):?><div class="empty compact">Todavía no has protegido dinero.</div><?php endif;?>
       <?php foreach(($savings['account_breakdown']??[]) as $ab):?>
         <div class="savings-vault-account"><span><?=e($ab['icon']?:'🏦')?></span><div><b><?=e($ab['name'])?></b><small>Protegido dentro de esta cuenta</small></div><strong>S/ <?=number_format((float)$ab['amount'],2)?></strong></div>
@@ -60,21 +93,21 @@ page_top('Ahorro','ahorro');
   </section>
 
   <?php if((float)$savings['general_saved']>0.005):?>
-  <section class="savings-general-card">
-    <div><span class="savings-goal-icon">🐷</span><div><small>AHORRO GENERAL</small><h3>Sin una meta específica</h3><p>Dinero protegido que todavía no asignaste a un objetivo.</p></div></div>
+  <section class="savings-general-card piggy-general-card">
+    <div><span class="savings-goal-icon">🐷</span><div><small>AHORRO GENERAL</small><h3>Mi guardadito libre</h3><p>Dinero protegido que todavía no asignaste a una meta específica.</p></div></div>
     <strong>S/ <?=number_format((float)$savings['general_saved'],2)?></strong>
     <div class="savings-goal-actions"><button type="button" class="btn primary" data-save-to-goal="0">＋ Guardar más</button><button type="button" class="btn" data-withdraw-general="0">Retirar</button></div>
   </section>
   <?php endif;?>
 
   <section class="savings-section-head"><div><h2>Metas de ahorro</h2><p>Las metas son opcionales: sirven para decir para qué estás ahorrando.</p></div><a href="<?=e(app_url('configuracion/metas'))?>" class="text-link">Administrar metas</a></section>
-  <div class="savings-goal-grid savings-goal-grid-v6">
+  <div class="savings-goal-grid savings-goal-grid-v6 piggy-goal-grid">
     <?php if(!$savings['goals']): ?>
-      <div class="savings-empty"><span>◎</span><h3>Aún no tienes metas</h3><p>Puedes ahorrar sin meta o crear una para Emergencia, Viaje, Casa, etc.</p><a class="btn" href="<?=e(app_url('configuracion/metas'))?>">Crear meta</a></div>
+      <div class="savings-empty"><span>🐷</span><h3>Aún no tienes metas</h3><p>Puedes ahorrar sin meta o crear una para Emergencia, Viaje, Casa, etc.</p><a class="btn" href="<?=e(app_url('configuracion/metas'))?>">Crear meta</a></div>
     <?php endif; ?>
     <?php foreach($savings['goals'] as $g): $pct=(float)$g['progress']; ?>
-      <article class="savings-goal-card savings-goal-card-v6" data-goal-card="<?=e($g['id'])?>">
-        <div class="savings-goal-top"><span class="savings-goal-icon">🎯</span><div><small>META · <?=e($g['period'])?></small><h3><?=e($g['name'])?></h3></div><button type="button" class="savings-edit-btn" data-edit-goal="<?=e($g['id'])?>" data-target="<?=e($g['target_amount'])?>" data-period="<?=e($g['period'])?>">⋯</button></div>
+      <article class="savings-goal-card savings-goal-card-v6 piggy-goal-card" data-goal-card="<?=e($g['id'])?>">
+        <div class="savings-goal-top"><span class="savings-goal-icon">🐷</span><div><small>META · <?=e($g['period'])?></small><h3><?=e($g['name'])?></h3></div><button type="button" class="savings-edit-btn" data-edit-goal="<?=e($g['id'])?>" data-target="<?=e($g['target_amount'])?>" data-period="<?=e($g['period'])?>">⋯</button></div>
         <div class="savings-goal-amount"><span>Protegido para esta meta</span><strong>S/ <?=number_format((float)$g['saved_amount'],2)?></strong><small>de S/ <?=number_format((float)$g['target_amount'],2)?></small></div>
         <div class="savings-progress"><i style="width:<?=min(100,max(0,$pct))?>%;background:<?=e($g['fund_color'])?>"></i></div>
         <div class="savings-goal-meta"><span><b><?=number_format($pct,0)?>%</b> completado</span><span>Falta <b>S/ <?=number_format((float)$g['remaining_amount'],2)?></b></span></div>
@@ -89,7 +122,7 @@ page_top('Ahorro','ahorro');
     <?php endforeach; ?>
   </div>
 
-  <section class="finance-panel savings-history-panel"><div class="section-heading"><div><h2>Historial</h2><p>Cada vez que guardas o retiras dinero queda registrado.</p></div></div>
+  <section class="finance-panel savings-history-panel piggy-history-panel"><div class="section-heading"><div><h2>Historial</h2><p>Cada vez que guardas o retiras dinero queda registrado.</p></div></div>
     <div class="savings-history-list"><?php if($historyError):?><div class="empty compact"><?=e($historyError)?></div><?php endif;?>
       <?php if(!$history):?><div class="empty compact">Aún no hay movimientos de ahorro.</div><?php endif;?>
       <?php foreach($history as $h):?><div class="savings-history-row"><span class="savings-history-icon <?=$h['movement_type']==='deposit'?'in':'out'?>"><?=$h['movement_type']==='deposit'?'🔒':'🔓'?></span><div><b><?=$h['movement_type']==='deposit'?'Guardaste para ':'Retiraste de '?><?=e($h['goal_name'])?></b><small><?=e(date('d/m/Y H:i',strtotime($h['occurred_at'])))?> · <?=e(($h['from_account']?:'—').' → '.($h['to_account']?:'—'))?><?=!empty($h['note'])?' · '.e($h['note']):''?></small></div><strong class="<?=$h['movement_type']==='deposit'?'amount-in':'amount-out'?>"><?=$h['movement_type']==='deposit'?'+':'−'?> S/ <?=number_format((float)$h['amount'],2)?></strong></div><?php endforeach; ?>

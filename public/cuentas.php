@@ -6,6 +6,14 @@ require __DIR__.'/../app/layout.php';
 
 $accounts = FinanceService::accountBalances($uid);
 $protectedMap = FinanceService::savingsReservedByAccount($uid, null);
+$typeLabel = static function (string $type): string {
+    return match ($type) {
+        'bank' => 'Cuenta bancaria',
+        'wallet' => 'Billetera digital',
+        'cash' => 'Efectivo',
+        default => 'Otra cuenta',
+    };
+};
 foreach ($accounts as &$a) {
     $a['savings_reserved'] = max(0, (float)($protectedMap[(int)$a['id']] ?? 0));
     $a['spendable'] = max(0, (float)$a['balance'] - $a['savings_reserved']);
@@ -18,12 +26,12 @@ $totalSpendable = array_sum(array_map(function ($a) { return (float)$a['spendabl
 
 page_top('Cuentas', 'cuentas');
 ?>
-<div class="page-wrap finance-page accounts-clean-page">
+<div class="page-wrap finance-page accounts-clean-page accounts-friendlier-page">
   <div class="page-head finance-page-head accounts-clean-head">
     <div>
       <span class="eyebrow">DÓNDE ESTÁ TU DINERO</span>
       <h1>Mis cuentas</h1>
-      <p>Una vista simple para revisar saldos, ahorro protegido y dinero realmente disponible.</p>
+      <p>Ahora con una vista más visual: cada cuenta se siente como una tarjeta para entender rápido cuánto tienes y cuánto está libre.</p>
     </div>
     <div class="page-head-actions accounts-head-actions">
       <a class="btn primary" href="<?=e(app_url('dashboard?action=transfer'))?>">↔ Mover dinero</a>
@@ -40,20 +48,24 @@ page_top('Cuentas', 'cuentas');
     <article class="overview-mini-card">
       <span>Protegido en ahorro</span>
       <strong>S/ <?=number_format($totalProtected,2)?></strong>
-      <small>Dinero bloqueado tipo chanchito.</small>
+      <small>Dinero guardado como chanchito y separado de tus gastos.</small>
     </article>
     <article class="overview-mini-card is-soft">
       <span>Disponible real</span>
       <strong>S/ <?=number_format($totalSpendable,2)?></strong>
-      <small>Saldo utilizable antes de considerar pagos pendientes.</small>
+      <small>Lo que realmente puedes usar hoy antes de tocar el ahorro.</small>
     </article>
   </section>
 
-  <div class="simple-tip compact-tip"><span>💡</span><div><b>Regla rápida</b><p>Si el dinero pasa entre tus propias cuentas, usa <strong>Mover dinero</strong>. Si solo quieres protegerlo, usa <strong>Guardar en Ahorro</strong>.</p></div></div>
+  <div class="simple-tip compact-tip"><span>💡</span><div><b>Regla rápida</b><p>Si el dinero pasa entre tus propias cuentas, usa <strong>Mover dinero</strong>. Si solo quieres protegerlo, usa <strong>Guardar en ahorro</strong>.</p></div></div>
 
   <div class="accounts-clean-grid">
-    <?php foreach($accounts as $a): ?>
-    <form class="account-clean-card autosave-finance" data-endpoint="account_save.php">
+    <?php foreach($accounts as $a):
+      $label = $typeLabel((string)$a['account_type']);
+      $accent = (string)($a['color'] ?: '#111827');
+      $suffix = str_pad((string)(1000 + ((int)$a['id'] % 9000)), 4, '0', STR_PAD_LEFT);
+    ?>
+    <form class="account-clean-card account-debit-card autosave-finance" data-endpoint="account_save.php" style="--account-accent: <?=e($accent)?>;">
       <input type="hidden" name="id" value="<?=$a['id']?>">
 
       <div class="account-clean-top">
@@ -61,7 +73,7 @@ page_top('Cuentas', 'cuentas');
           <div class="account-clean-icon"><?=e($a['icon'])?></div>
           <div>
             <h3><?=e($a['name'])?></h3>
-            <p><?=e($a['account_type']==='bank' ? 'Cuenta bancaria' : ($a['account_type']==='wallet' ? 'Billetera digital' : ($a['account_type']==='cash' ? 'Efectivo' : 'Otra cuenta')))?></p>
+            <p><?=e($label)?></p>
           </div>
         </div>
         <div class="account-clean-top-right">
@@ -70,30 +82,56 @@ page_top('Cuentas', 'cuentas');
             <summary>⋯</summary>
             <div class="account-clean-menu-box">
               <button type="button" class="account-menu-action" data-open-account-edit>Editar cuenta</button>
-              <a class="account-menu-action" href="<?=e(app_url('ahorro?action=deposit&from='.$a['id']))?>">Guardar en Ahorro</a>
+              <a class="account-menu-action" href="<?=e(app_url('ahorro?action=deposit&from='.$a['id']))?>">Guardar en ahorro</a>
             </div>
           </details>
         </div>
       </div>
 
+      <div class="account-debit-visual">
+        <div class="account-debit-topline">
+          <span class="account-debit-chip" aria-hidden="true"></span>
+          <span class="account-debit-brand">Finanzapp</span>
+        </div>
+        <div class="account-debit-balance">
+          <span>Saldo disponible en esta cuenta</span>
+          <strong>S/ <?=number_format((float)$a['spendable'],2)?></strong>
+        </div>
+        <div class="account-debit-bottom">
+          <div>
+            <small>Titular</small>
+            <b><?=e($a['name'])?></b>
+          </div>
+          <div>
+            <small>Cuenta</small>
+            <b>•••• <?=$suffix?></b>
+          </div>
+          <div>
+            <small>Tipo</small>
+            <b><?=e($label)?></b>
+          </div>
+        </div>
+        <span class="account-debit-icon"><?=e($a['icon'])?></span>
+      </div>
+
       <div class="account-main-balance">
-        <span>Saldo en la cuenta</span>
+        <span>Saldo total registrado</span>
         <strong>S/ <?=number_format((float)$a['balance'],2)?></strong>
       </div>
 
       <div class="account-metrics-row">
         <div class="metric-pill warn">
-          <span>🔒 En ahorro</span>
+          <span>🐷 En ahorro</span>
           <strong>S/ <?=number_format((float)$a['savings_reserved'],2)?></strong>
         </div>
         <div class="metric-pill ok">
-          <span>Disponible real</span>
+          <span>✨ Dinero libre</span>
           <strong>S/ <?=number_format((float)$a['spendable'],2)?></strong>
         </div>
       </div>
 
       <div class="account-actions-row">
-        <a class="btn ghost" href="<?=e(app_url('ahorro?action=deposit&from='.$a['id']))?>">🐷 Guardar en Ahorro</a>
+        <a class="btn ghost" href="<?=e(app_url('ahorro?action=deposit&from='.$a['id']))?>">🐷 Guardar en ahorro</a>
         <a class="btn secondary" href="<?=e(app_url('dashboard?action=transfer&from='.$a['id']))?>">↔ Mover</a>
       </div>
 
